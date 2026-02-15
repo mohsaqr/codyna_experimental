@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resilience &amp; Hurst Toolkit - R Package Documentation</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a2e;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --border: #e5e7eb;
+    --code-bg: #f8fafc;
+    --code-border: #e2e8f0;
+    --table-stripe: #f9fafb;
+    --header-bg: #0f172a;
+    --success: #059669;
+    --warn: #d97706;
+    --sidebar-w: 280px;
+    --output-bg: #f0fdf4;
+    --output-border: #86efac;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    color: var(--fg);
+    line-height: 1.7;
+    background: var(--bg);
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0;
+    width: var(--sidebar-w);
+    height: 100vh;
+    overflow-y: auto;
+    background: var(--header-bg);
+    color: #cbd5e1;
+    padding: 1.5rem 0;
+    font-size: 0.85rem;
+    z-index: 100;
+    scrollbar-width: thin;
+    scrollbar-color: #334155 transparent;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+
+  .sidebar .logo {
+    padding: 0 1.5rem 1.2rem;
+    border-bottom: 1px solid #1e293b;
+    margin-bottom: 1rem;
+  }
+  .sidebar .logo h1 {
+    font-size: 1.3rem;
+    color: #f1f5f9;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .sidebar .logo p {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 0.2rem;
+  }
+
+  .sidebar nav ul { list-style: none; }
+  .sidebar nav > ul > li > a {
+    display: block;
+    padding: 0.5rem 1.5rem;
+    color: #94a3b8;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: color 0.15s;
+  }
+  .sidebar nav > ul > li > a:hover { color: #e2e8f0; }
+
+  .sidebar nav > ul > li > ul { margin-bottom: 0.5rem; }
+  .sidebar nav > ul > li > ul > li > a {
+    display: block;
+    padding: 0.3rem 1.5rem 0.3rem 2.2rem;
+    color: #94a3b8;
+    text-decoration: none;
+    font-size: 0.82rem;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    transition: all 0.15s;
+    border-left: 2px solid transparent;
+  }
+  .sidebar nav > ul > li > ul > li > a:hover {
+    color: #e2e8f0;
+    background: rgba(255,255,255,0.04);
+    border-left-color: var(--accent);
+  }
+
+  /* ── Main content ── */
+  .main {
+    margin-left: var(--sidebar-w);
+    max-width: 900px;
+    padding: 2.5rem 3rem 5rem;
+  }
+
+  h2 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin: 3rem 0 0.5rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--border);
+    color: var(--fg);
+    letter-spacing: -0.02em;
+  }
+  h2:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+
+  h3 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 2rem 0 0.5rem;
+    color: var(--fg);
+  }
+  h3 code {
+    font-size: 1.1rem;
+    color: var(--accent);
+    background: var(--accent-light);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+  }
+
+  h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 1.5rem 0 0.4rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  p { margin: 0.5rem 0; color: #374151; }
+
+  /* ── Hero ── */
+  .hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+    color: white;
+    padding: 2.5rem 2rem;
+    border-radius: 12px;
+    margin-bottom: 2.5rem;
+  }
+  .hero h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; }
+  .hero p { color: #94a3b8; font-size: 1.05rem; margin-top: 0.5rem; }
+  .hero .badges { margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .hero .badge {
+    display: inline-block;
+    padding: 0.25rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .badge-blue { background: #1d4ed8; color: #dbeafe; }
+  .badge-green { background: #065f46; color: #d1fae5; }
+  .badge-purple { background: #5b21b6; color: #ede9fe; }
+  .badge-amber { background: #92400e; color: #fef3c7; }
+
+  /* ── Code blocks ── */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    margin: 0.8rem 0;
+  }
+  code {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.88em;
+  }
+  p code, li code, td code {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+    color: #be185d;
+    font-size: 0.85em;
+  }
+
+  /* ── Signature blocks ── */
+  .signature {
+    background: #f8fafc;
+    border-left: 3px solid var(--accent);
+    padding: 0.8rem 1rem;
+    border-radius: 0 8px 8px 0;
+    margin: 0.8rem 0;
+    overflow-x: auto;
+  }
+  .signature code { color: var(--fg); font-size: 0.82rem; }
+
+  /* ── Output blocks ── */
+  .output {
+    background: var(--output-bg);
+    border: 1px solid var(--output-border);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    font-size: 0.82rem;
+    overflow-x: auto;
+    margin: 0.5rem 0 1rem;
+    position: relative;
+  }
+  .output::before {
+    content: 'Output';
+    position: absolute;
+    top: -0.6rem;
+    left: 0.8rem;
+    background: var(--output-bg);
+    padding: 0 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--success);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .output code { color: #166534; background: none; border: none; padding: 0; }
+
+  /* ── Tables ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.8rem 0 1.2rem;
+    font-size: 0.88rem;
+  }
+  th {
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 2px solid var(--fg);
+    font-weight: 600;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+  td {
+    padding: 0.45rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:nth-child(even) { background: var(--table-stripe); }
+
+  /* ── Collapsible ── */
+  details {
+    margin: 0.8rem 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  summary {
+    padding: 0.7rem 1rem;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    background: #f9fafb;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  summary:hover { background: #f3f4f6; }
+  details[open] summary { border-bottom: 1px solid var(--border); }
+  details .detail-content { padding: 1rem; }
+
+  /* ── Lists ── */
+  ul, ol { padding-left: 1.5rem; margin: 0.4rem 0; }
+  li { margin: 0.25rem 0; color: #374151; }
+
+  /* ── Install box ── */
+  .install-box {
+    background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin: 1rem 0 2rem;
+  }
+
+  /* ── Quick ref ── */
+  .quick-ref {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.8rem;
+    margin: 1rem 0 2rem;
+  }
+  .quick-ref-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    transition: box-shadow 0.15s;
+  }
+  .quick-ref-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .quick-ref-card h4 {
+    margin: 0 0 0.4rem;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--fg);
+    font-size: 0.92rem;
+  }
+  .quick-ref-card .funcs {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.8rem;
+    color: var(--accent);
+  }
+
+  /* ── Notes ── */
+  .note {
+    background: #fffbeb;
+    border-left: 3px solid #f59e0b;
+    padding: 0.6rem 1rem;
+    border-radius: 0 6px 6px 0;
+    margin: 0.8rem 0;
+    font-size: 0.88rem;
+  }
+
+  .returns {
+    background: #f0f9ff;
+    border-left: 3px solid #0ea5e9;
+    padding: 0.6rem 1rem;
+    border-radius: 0 6px 6px 0;
+    margin: 0.8rem 0;
+    font-size: 0.88rem;
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .main { margin-left: 0; padding: 1.5rem; }
+    .quick-ref { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ SIDEBAR ═══════════════ -->
+<aside class="sidebar">
+  <div class="logo">
+    <h1>resilience</h1>
+    <p>codyna extension &middot; R Toolkit</p>
+  </div>
+  <nav>
+    <ul>
+      <li><a href="#getting-started">Getting Started</a></li>
+      <li><a href="#data-generation">Data Generation</a>
+        <ul>
+          <li><a href="#generate_ts_data">generate_ts_data()</a></li>
+          <li><a href="#generate_tipping_data">generate_tipping_data()</a></li>
+          <li><a href="#compare_ts">compare_ts()</a></li>
+        </ul>
+      </li>
+      <li><a href="#resilience-metrics">Resilience Metrics</a>
+        <ul>
+          <li><a href="#resilience">resilience()</a></li>
+        </ul>
+      </li>
+      <li><a href="#classification">Classification</a>
+        <ul>
+          <li><a href="#classify_resilience">classify_resilience()</a></li>
+          <li><a href="#plot_resilience">plot.resilience()</a></li>
+        </ul>
+      </li>
+      <li><a href="#hurst-analysis">Hurst Analysis</a>
+        <ul>
+          <li><a href="#hurst">hurst()</a></li>
+          <li><a href="#plot_hurst">plot.hurst()</a></li>
+        </ul>
+      </li>
+      <li><a href="#early-warning">Early Warning Signals</a>
+        <ul>
+          <li><a href="#detect_hurst_warnings">detect_hurst_warnings()</a></li>
+          <li><a href="#plot_hurst_ews">plot.hurst_ews()</a></li>
+        </ul>
+      </li>
+      <li><a href="#trend-analysis">Trend Analysis</a>
+        <ul>
+          <li><a href="#compute_trend">compute_trend()</a></li>
+          <li><a href="#plot_trend">plot.trend()</a></li>
+        </ul>
+      </li>
+      <li><a href="#multivariate-ews">Multivariate EWS</a>
+        <ul>
+          <li><a href="#detect_multivariate_warnings">detect_multivariate_warnings()</a></li>
+          <li><a href="#plot_multi_ews">plot.multi_ews()</a></li>
+        </ul>
+      </li>
+      <li><a href="#changepoint-detection">Changepoint Detection</a>
+        <ul>
+          <li><a href="#detect_changepoints">detect_changepoints()</a></li>
+          <li><a href="#plot_changepoint">plot.changepoint()</a></li>
+        </ul>
+      </li>
+      <li><a href="#spectral-ews">Spectral EWS</a>
+        <ul>
+          <li><a href="#spectral_ews">spectral_ews()</a></li>
+          <li><a href="#plot_spectral">plot.spectral()</a></li>
+        </ul>
+      </li>
+      <li><a href="#potential-analysis">Potential Analysis</a>
+        <ul>
+          <li><a href="#potential_analysis">potential_analysis()</a></li>
+          <li><a href="#plot_potential">plot.potential()</a></li>
+        </ul>
+      </li>
+      <li><a href="#surrogate-testing">Surrogate Testing</a>
+        <ul>
+          <li><a href="#surrogate_test">surrogate_test()</a></li>
+          <li><a href="#plot_surrogate">plot.surrogate_test()</a></li>
+        </ul>
+      </li>
+      <li><a href="#sensitivity-analysis">Sensitivity Analysis</a>
+        <ul>
+          <li><a href="#sensitivity_ews">sensitivity_ews()</a></li>
+          <li><a href="#plot_sensitivity">plot.sensitivity_ews()</a></li>
+        </ul>
+      </li>
+      <li><a href="#tna-interop">TNA Interoperability</a>
+        <ul>
+          <li><a href="#to_tna">to_tna()</a></li>
+        </ul>
+      </li>
+    </ul>
+  </nav>
+</aside>
+
+<!-- ═══════════════ MAIN ═══════════════ -->
+<div class="main">
+
+<!-- ── Hero ── -->
+<section id="getting-started">
+<div class="hero">
+  <h1>Resilience &amp; Hurst Toolkit</h1>
+  <p>A codyna extension for quantifying system resilience through rolling-window metrics, Hurst exponent dynamics, trend classification, multivariate early warning signals, changepoint detection, spectral analysis, stability landscapes, surrogate significance testing, sensitivity analysis, and TNA interoperability. Provides 19 exported functions covering synthetic data generation, eight resilience indicators with composite scoring, three Hurst estimation methods with state classification and EWS detection, rolling trend classification, 11-metric multivariate EWS, CUSUM/PELT/binary segmentation changepoint detection, rolling spectral exponent analysis, quasi-potential landscape estimation, surrogate-based significance testing, parameter sensitivity sweeps, and state-to-sequence extraction for transition network analysis.</p>
+  <div class="badges">
+    <span class="badge badge-blue">codyna extension</span>
+    <span class="badge badge-green">Resilience</span>
+    <span class="badge badge-purple">Hurst / DFA</span>
+    <span class="badge badge-amber">Early Warning Signals</span>
+    <span class="badge badge-blue">Changepoints</span>
+    <span class="badge badge-green">Spectral</span>
+    <span class="badge badge-purple">Potential</span>
+  </div>
+</div>
+
+<div class="install-box">
+  <h4>Setup</h4>
+<pre><code># Source all toolkit files
+source("datagen.R")
+source("resilience.R")
+source("hurst.R")
+source("trend.R")
+source("multivariate_ews.R")
+source("changepoint.R")
+source("spectral.R")
+source("potential.R")
+source("surrogates.R")
+source("sensitivity.R")
+source("to_tna.R")</code></pre>
+  <p>All analysis objects have <code>print()</code>, <code>summary()</code>, and <code>plot()</code> methods. State sequences from any analysis can be exported to TNA format via <code>to_tna()</code>. The toolkit depends on <code>ggplot2</code>, <code>tibble</code>, <code>dplyr</code>, <code>tidyr</code>, <code>patchwork</code>, <code>rlang</code>, and <code>scales</code>.</p>
+</div>
+
+<div class="quick-ref">
+  <div class="quick-ref-card">
+    <h4>Data Generation</h4>
+    <div class="funcs">generate_ts_data() &middot; generate_tipping_data() &middot; compare_ts()</div>
+  </div>
+  <div class="quick-ref-card">
+    <h4>Resilience Analysis</h4>
+    <div class="funcs">resilience() &middot; classify_resilience() &middot; plot.resilience()</div>
+  </div>
+  <div class="quick-ref-card">
+    <h4>Hurst &amp; Univariate EWS</h4>
+    <div class="funcs">hurst() &middot; plot.hurst() &middot; detect_hurst_warnings() &middot; plot.hurst_ews()</div>
+  </div>
+  <div class="quick-ref-card">
+    <h4>Trend Analysis</h4>
+    <div class="funcs">compute_trend() &middot; plot.trend() &middot; summary.trend()</div>
+  </div>
+  <div class="quick-ref-card">
+    <h4>Multivariate EWS</h4>
+    <div class="funcs">detect_multivariate_warnings() &middot; plot.multi_ews() &middot; summary.multi_ews()</div>
+  </div>
+  <div class="quick-ref-card">
+    <h4>Changepoint Detection</h4>
+    <div class="funcs">detect_changepoints() &middot; plot.changepoint() &middot; summary.changepoint()</div>
+  </div>
+  <div class="quick-ref-card">
+    <h4>Spectral EWS</h4>
+    <div class="funcs">spectral_ews() &middot; plot.spectral() &middot; summary.spectral()</div>
+  </div>
+  <div class="quick-ref-card">
+    <h4>Potential Analysis</h4>
+    <div class="funcs">potential_analysis() &middot; plot.potential() &middot; summary.potential()</div>
+  </div>
+  <div class="quick-ref-card">
+    <h4>Surrogate Testing</h4>
+    <div class="funcs">surrogate_test() &middot; plot.surrogate_test() &middot; summary.surrogate_test()</div>
+  </div>
+  <div class="quick-ref-card">
+    <h4>Sensitivity Analysis</h4>
+    <div class="funcs">sensitivity_ews() &middot; plot.sensitivity_ews() &middot; summary.sensitivity_ews()</div>
+  </div>
+  <div class="quick-ref-card">
+    <h4>TNA Interoperability</h4>
+    <div class="funcs">to_tna() &middot; methods for 8 analysis classes</div>
+  </div>
+</div>
+</section>
+
+<!-- ═══════════════ DATA GENERATION ═══════════════ -->
+<h2 id="data-generation">Data Generation</h2>
+
+<!-- generate_ts_data -->
+<h3 id="generate_ts_data"><code>generate_ts_data()</code></h3>
+<p>Use this function when you need a time series with known ground-truth phase labels to validate your resilience pipeline. It generates synthetic data with realistic phase dynamics&mdash;stable plateaus, shocks, recovery ramps, volatile bursts, and turbulent drifts&mdash;so you can measure how accurately <code>classify_resilience()</code> recovers the true labels. In <code>"clustered"</code> mode it produces level-separated segments useful for testing classification boundaries.</p>
+
+<p>Without ground-truth data your resilience metrics are unvalidated numbers; this function closes that gap by giving you data where you already know the answer.</p>
+
+<div class="signature"><code>generate_ts_data(n_individuals = 1L, data_length = 500L, data_type = "resilience",
+                 n_stable_levels = 3L, mean_stable_value = 100,
+                 level_separation = 20, n_levels = 3L,
+                 results_df = NULL, results_col = NULL,
+                 seed = 42L, generate_plot = TRUE)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>n_individuals</code></td><td>Number of distinct individuals to generate (1&ndash;100). Each gets an independent time series with its own random phase ordering.</td><td><code>1</code></td></tr>
+    <tr><td><code>data_length</code></td><td>Number of data points per individual (50&ndash;100,000). Longer series give more room for each phase.</td><td><code>500</code></td></tr>
+    <tr><td><code>data_type</code></td><td>Generation mode: <code>"resilience"</code> produces dynamic phases (Stable, Shock, Recovery, Volatile, Turbulent); <code>"clustered"</code> produces distinct value levels with a quantile-based benchmark column.</td><td><code>"resilience"</code></td></tr>
+    <tr><td><code>n_stable_levels</code></td><td>Number of stable levels in resilience mode. Controls how many distinct stable plateaus appear (e.g., Stable Low, Stable, Stable High).</td><td><code>3</code></td></tr>
+    <tr><td><code>mean_stable_value</code></td><td>Central value of the stable phase. Dynamic phases scale relative to this value.</td><td><code>100</code></td></tr>
+    <tr><td><code>level_separation</code></td><td>Percentage separation between stable levels. Higher values produce more widely spaced plateaus.</td><td><code>20</code></td></tr>
+    <tr><td><code>n_levels</code></td><td>Number of clusters in clustered mode (2&ndash;6). Ignored for resilience mode.</td><td><code>3</code></td></tr>
+    <tr><td><code>results_df</code></td><td>Optional external results data frame for comparison plotting. When provided, the plot overlays external classifications against the ground truth.</td><td><code>NULL</code></td></tr>
+    <tr><td><code>results_col</code></td><td>Column name in <code>results_df</code> containing the classification labels. Required when <code>results_df</code> is not <code>NULL</code>.</td><td><code>NULL</code></td></tr>
+    <tr><td><code>seed</code></td><td>Random seed for reproducibility. Each individual gets <code>seed + i</code> as its seed.</td><td><code>42</code></td></tr>
+    <tr><td><code>generate_plot</code></td><td>If <code>TRUE</code>, return a list with <code>$data</code> and <code>$plot</code>. If <code>FALSE</code>, return just the data frame.</td><td><code>TRUE</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> If <code>generate_plot = TRUE</code>, a <code>list(data, plot)</code> where <code>data</code> is a data frame with columns <code>time</code>, <code>value</code>, <code>true_phase</code>, and <code>id</code>; <code>plot</code> is a ggplot/patchwork object. If <code>generate_plot = FALSE</code>, just the data frame.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code># Generate a single resilience time series with ground-truth phases
+result &lt;- generate_ts_data(
+  n_individuals = 1,
+  data_length = 500,
+  data_type = "resilience",
+  seed = 42
+)
+head(result$data)
+result$plot
+
+# Generate clustered data for classification testing
+clustered &lt;- generate_ts_data(
+  data_type = "clustered",
+  n_levels = 4,
+  data_length = 1000,
+  generate_plot = TRUE
+)
+clustered$plot
+
+# Compare model output against ground truth
+res &lt;- resilience(result$data$value, window = 50)
+cls &lt;- classify_resilience(res)
+generate_ts_data(
+  results_df = cls,
+  results_col = "composite_category",
+  generate_plot = TRUE
+)</code></pre>
+  </div>
+</details>
+
+<!-- generate_tipping_data -->
+<h3 id="generate_tipping_data"><code>generate_tipping_data()</code></h3>
+<p>Use this function when you need multivariate data with a known tipping point to test early warning signal detection. It simulates a system that is stable before a specified time point, then experiences increasing external forcing that pushes it toward instability. This lets you verify whether <code>detect_hurst_warnings()</code> correctly flags the transition zone.</p>
+
+<p>The forcing model is autoregressive with a restoring coefficient that increases over time, combined with noise that grows proportionally&mdash;mimicking real-world systems where loss of resilience amplifies both drift and variability simultaneously.</p>
+
+<div class="signature"><code>generate_tipping_data(n_time = 100L, n_vars = 5L, tipping_point = 60L,
+                      stability_strength = 0.8, forcing_strength = 0.01,
+                      saturation_point = 80L)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>n_time</code></td><td>Total number of time points (10&ndash;100,000). The series length determines how much pre- and post-tipping data you have.</td><td><code>100</code></td></tr>
+    <tr><td><code>n_vars</code></td><td>Number of variables in the system (1&ndash;100). Each variable evolves under the same forcing regime but with independent noise.</td><td><code>5</code></td></tr>
+    <tr><td><code>tipping_point</code></td><td>Time point at which external forcing begins. Everything before this is the stable reference period.</td><td><code>60</code></td></tr>
+    <tr><td><code>stability_strength</code></td><td>Restoring-force coefficient during the stable period. Values closer to 1.0 produce stronger autoregressive persistence.</td><td><code>0.8</code></td></tr>
+    <tr><td><code>forcing_strength</code></td><td>Rate at which the restoring coefficient increases per time step after the tipping point. Controls how quickly the system destabilizes.</td><td><code>0.01</code></td></tr>
+    <tr><td><code>saturation_point</code></td><td>Time after which the forcing stops increasing. Prevents the system from diverging to infinity.</td><td><code>80</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>data.frame</code> with a <code>Time</code> column followed by <code>VAR1</code>, <code>VAR2</code>, ..., <code>VARn</code>. Each variable column contains the simulated values.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code># Generate a 5-variable system with tipping point at t=60
+tip_data &lt;- generate_tipping_data(
+  n_time = 200,
+  n_vars = 5,
+  tipping_point = 100,
+  forcing_strength = 0.02
+)
+
+# Analyze one variable for early warning signals
+h &lt;- hurst(tip_data$VAR1, method = "dfa", window = 30)
+ews &lt;- detect_hurst_warnings(h)
+plot(ews)</code></pre>
+  </div>
+</details>
+
+<!-- compare_ts -->
+<h3 id="compare_ts"><code>compare_ts()</code></h3>
+<p>Use this function when you need to visually compare one or two classification schemes side by side against the raw time series. It produces a time series line plot with colored background bands representing class labels&mdash;letting you immediately see where two classifiers agree and where they diverge. This is particularly useful for comparing ground-truth phases from <code>generate_ts_data()</code> against <code>classify_resilience()</code> output.</p>
+
+<p>When only <code>state1</code> is provided, you get a single panel. When both <code>state1</code> and <code>state2</code> are provided, you get a stacked two-panel patchwork with independent color palettes so the labels remain visually distinct.</p>
+
+<div class="signature"><code>compare_ts(data, data2 = NULL, ts_col, time_col = NULL,
+           state1, state2 = NULL, facet_by = NULL,
+           title1 = "Classification 1", title2 = "Classification 2",
+           palette1 = "Set2", palette2 = "Set3")</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>data</code></td><td>Primary data frame containing the time series values and the first classification column.</td><td>&mdash;</td></tr>
+    <tr><td><code>data2</code></td><td>Optional second data frame containing <code>state2</code>. If <code>NULL</code>, <code>state2</code> is looked up in <code>data</code>. Must have the same number of rows as <code>data</code>.</td><td><code>NULL</code></td></tr>
+    <tr><td><code>ts_col</code></td><td>Column name for the time series values to plot as the line.</td><td>&mdash;</td></tr>
+    <tr><td><code>time_col</code></td><td>Column name for the time axis. If <code>NULL</code>, row index is used and a message is emitted.</td><td><code>NULL</code></td></tr>
+    <tr><td><code>state1</code></td><td>Column name for the first classification (colored background bands).</td><td>&mdash;</td></tr>
+    <tr><td><code>state2</code></td><td>Column name for the second classification. If <code>NULL</code>, only one panel is produced.</td><td><code>NULL</code></td></tr>
+    <tr><td><code>facet_by</code></td><td>Column name to facet by (e.g., individual ID). Each facet gets its own y-axis scale.</td><td><code>NULL</code></td></tr>
+    <tr><td><code>title1</code></td><td>Title for the first panel.</td><td><code>"Classification 1"</code></td></tr>
+    <tr><td><code>title2</code></td><td>Title for the second panel.</td><td><code>"Classification 2"</code></td></tr>
+    <tr><td><code>palette1</code></td><td>RColorBrewer palette name for the first panel&rsquo;s fill colors.</td><td><code>"Set2"</code></td></tr>
+    <tr><td><code>palette2</code></td><td>RColorBrewer palette name for the second panel&rsquo;s fill colors.</td><td><code>"Set3"</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>ggplot</code> object (single panel) or a <code>patchwork</code> object (two panels stacked vertically).</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code># Single-panel: show ground-truth phases
+syn &lt;- generate_ts_data(generate_plot = FALSE)
+compare_ts(
+  data = syn,
+  ts_col = "value",
+  time_col = "time",
+  state1 = "true_phase",
+  title1 = "Ground Truth Phases"
+)
+
+# Two-panel: compare ground truth vs model classification
+res &lt;- resilience(syn$value, window = 50)
+cls &lt;- classify_resilience(res)
+syn$predicted &lt;- cls$composite_category
+compare_ts(
+  data = syn,
+  ts_col = "value",
+  time_col = "time",
+  state1 = "true_phase",
+  state2 = "predicted",
+  title1 = "Ground Truth",
+  title2 = "Model Classification"
+)</code></pre>
+  </div>
+</details>
+
+<!-- ═══════════════ RESILIENCE METRICS ═══════════════ -->
+<h2 id="resilience-metrics">Resilience Metrics</h2>
+
+<!-- resilience -->
+<h3 id="resilience"><code>resilience()</code></h3>
+<p>Use this function when you need to quantify how a system responds to perturbation across time. It computes eight rolling-window indicators that together capture different dimensions of resilience: stability (VSI), volatility (ARCH-LM), variability (CV), recovery capacity (recovery time and slope), complexity (sample entropy), long-range memory (DFA alpha), and autocorrelation structure (AC ratio). No single metric captures resilience; the eight indicators provide complementary views that you later combine via <code>classify_resilience()</code>.</p>
+
+<p>The rolling-window approach means each metric is computed locally, revealing how resilience evolves over time rather than producing a single global number. This is critical for detecting transitions: a system that was resilient early may lose resilience before a tipping point.</p>
+
+<div class="signature"><code>resilience(data, window = 50L, align = "right", metrics = "all",
+           shock_threshold = 2, recovery_threshold = 0.1,
+           recovery_window = 5L, baseline_window = 10L,
+           edim = 2L, r = NULL, tau = 1L,
+           max_lag = 5L, lags = 1L, demean = FALSE)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>data</code></td><td>Univariate time series data. Accepts <code>ts</code>, <code>numeric</code> vector, or single-column <code>data.frame</code>.</td><td>&mdash;</td></tr>
+    <tr><td><code>window</code></td><td>Rolling window size (must be at least 20). Larger windows produce smoother metrics but reduce temporal resolution.</td><td><code>50</code></td></tr>
+    <tr><td><code>align</code></td><td>Window alignment: <code>"right"</code> (metric at window end), <code>"center"</code>, or <code>"left"</code> (metric at window start). Right alignment is causal and standard for real-time monitoring.</td><td><code>"right"</code></td></tr>
+    <tr><td><code>metrics</code></td><td>Character vector of metrics to compute, or <code>"all"</code> for all eight. Available: <code>"vsi"</code>, <code>"arch_lm"</code>, <code>"cv"</code>, <code>"recovery_time"</code>, <code>"recovery_slope"</code>, <code>"sample_entropy"</code>, <code>"dfa_alpha"</code>, <code>"ac_ratio"</code>.</td><td><code>"all"</code></td></tr>
+    <tr><td><code>shock_threshold</code></td><td>Number of baseline standard deviations a value must exceed to be classified as a shock. Used by recovery_time and recovery_slope.</td><td><code>2</code></td></tr>
+    <tr><td><code>recovery_threshold</code></td><td>Fraction of baseline SD within which the system is considered recovered after a shock.</td><td><code>0.1</code></td></tr>
+    <tr><td><code>recovery_window</code></td><td>Number of points after a shock over which the recovery slope is fitted.</td><td><code>5</code></td></tr>
+    <tr><td><code>baseline_window</code></td><td>Number of initial points in each rolling window used to establish the baseline mean and SD for shock detection.</td><td><code>10</code></td></tr>
+    <tr><td><code>edim</code></td><td>Embedding dimension for sample entropy. Higher values capture longer patterns but require more data.</td><td><code>2</code></td></tr>
+    <tr><td><code>r</code></td><td>Tolerance radius for sample entropy template matching. If <code>NULL</code>, defaults to <code>0.2 * sd(window_data)</code>.</td><td><code>NULL</code></td></tr>
+    <tr><td><code>tau</code></td><td>Time delay for sample entropy embedding. Values &gt; 1 skip intermediate points.</td><td><code>1</code></td></tr>
+    <tr><td><code>max_lag</code></td><td>Maximum lag for autocorrelation ratio computation.</td><td><code>5</code></td></tr>
+    <tr><td><code>lags</code></td><td>Number of lags for the ARCH-LM test regression.</td><td><code>1</code></td></tr>
+    <tr><td><code>demean</code></td><td>Whether to subtract the mean before computing the ARCH-LM statistic.</td><td><code>FALSE</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> An object of class <code>resilience</code> (a tibble) with columns <code>time</code>, <code>value</code>, and one column per requested metric. Attributes store <code>window</code>, <code>align</code>, and <code>metrics</code>.</div>
+
+<h4>Available Metrics</h4>
+<table>
+  <thead><tr><th>Metric</th><th>What it measures</th><th>Direction</th></tr></thead>
+  <tbody>
+    <tr><td><code>vsi</code></td><td>Variance Stability Index &mdash; variance of rolling variances. High values indicate destabilization.</td><td>Lower = more resilient</td></tr>
+    <tr><td><code>arch_lm</code></td><td>ARCH-LM test statistic &mdash; detects volatility clustering (GARCH effects).</td><td>Lower = more resilient</td></tr>
+    <tr><td><code>cv</code></td><td>Coefficient of Variation &mdash; relative dispersion (SD / mean).</td><td>Lower = more resilient</td></tr>
+    <tr><td><code>recovery_time</code></td><td>Median time steps to return to baseline after shocks.</td><td>Lower = more resilient</td></tr>
+    <tr><td><code>recovery_slope</code></td><td>Median slope of the recovery trajectory after shocks.</td><td>Higher = more resilient</td></tr>
+    <tr><td><code>sample_entropy</code></td><td>Regularity/complexity of the signal. Low entropy means high predictability.</td><td>Higher = more resilient</td></tr>
+    <tr><td><code>dfa_alpha</code></td><td>DFA scaling exponent &mdash; long-range memory. Values near 1.5 indicate strong persistence.</td><td>Lower = more resilient</td></tr>
+    <tr><td><code>ac_ratio</code></td><td>Ratio of lag-1 autocorrelation to mean higher-lag autocorrelation. High values signal critical slowing down.</td><td>Higher = more resilient</td></tr>
+  </tbody>
+</table>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code># Compute all resilience metrics with a 50-point rolling window
+set.seed(42)
+x &lt;- cumsum(rnorm(500))
+res &lt;- resilience(x, window = 50L)
+print(res)
+
+# Compute only stability and volatility metrics
+res_subset &lt;- resilience(x, window = 50L, metrics = c("vsi", "arch_lm"))
+
+# Use center alignment for symmetric smoothing
+res_center &lt;- resilience(x, window = 50L, align = "center")
+
+# Visualize raw metric trajectories
+plot(res, type = "lines")</code></pre>
+  </div>
+</details>
+
+<!-- ═══════════════ CLASSIFICATION ═══════════════ -->
+<h2 id="classification">Classification</h2>
+
+<!-- classify_resilience -->
+<h3 id="classify_resilience"><code>classify_resilience()</code></h3>
+<p>Use this function to convert raw resilience metric values into interpretable scores and categories. Raw metrics have different scales and directions (some are "lower is better," others "higher is better"), making them impossible to compare directly. This function normalizes each metric directionally, applies optional smoothing, and computes a weighted composite score that collapses eight dimensions into a single 0&ndash;1 resilience index with six category labels from "Excellent" to "Troubled."</p>
+
+<p>The default normalization method (<code>"empirical_state_aware"</code>) uses thresholds derived from known resilience phases, making it robust to outliers and interpretable across datasets. The composite weights are empirically calibrated so that VSI and CV contribute most to the final score, matching their observed importance in distinguishing resilient from non-resilient states.</p>
+
+<div class="signature"><code>classify_resilience(data, method = "empirical_state_aware",
+                    weights = NULL, smooth_window = 10L,
+                    smooth_method = "median")</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>data</code></td><td>A <code>resilience</code> object as returned by <code>resilience()</code>.</td><td>&mdash;</td></tr>
+    <tr><td><code>method</code></td><td>Normalization method for scaling raw metrics. Options: <code>"empirical_state_aware"</code> (state-aware thresholds), <code>"empirical_percentile"</code> (hardcoded percentile bins), <code>"percentile"</code> (rank-based CDF), <code>"minmax"</code> (min-max to [0,1]), <code>"zscore"</code> (z-score standardization), <code>"divide_max"</code> (division by absolute max).</td><td><code>"empirical_state_aware"</code></td></tr>
+    <tr><td><code>weights</code></td><td>Named numeric vector of metric weights for the composite score. If <code>NULL</code>, uses empirically derived defaults (VSI: 0.256, CV: 0.226, ARCH-LM: 0.188, AC ratio: 0.070, Recovery slope: 0.058, DFA alpha: 0.036, Sample entropy: 0.028, Recovery time: 0.016).</td><td><code>NULL</code></td></tr>
+    <tr><td><code>smooth_window</code></td><td>Window size for post-scaling smoothing applied to each metric score. Set to <code>1</code> to disable smoothing.</td><td><code>10</code></td></tr>
+    <tr><td><code>smooth_method</code></td><td>Smoothing function: <code>"median"</code> (robust to spikes) or <code>"mean"</code>.</td><td><code>"median"</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> The input <code>resilience</code> object augmented with additional columns: <code>{metric}_score</code> (0&ndash;1 normalized score per metric), <code>{metric}_category</code> (six-level factor: Excellent, Solid, Fair, Vulnerable, Failing, Troubled), <code>composite_score</code> (weighted average), and <code>composite_category</code>.</div>
+
+<div class="note"><strong>Category breaks:</strong> Excellent (0&ndash;0.15), Solid (0.15&ndash;0.30), Fair (0.30&ndash;0.50), Vulnerable (0.50&ndash;0.70), Failing (0.70&ndash;0.85), Troubled (0.85&ndash;1.0). Lower composite scores indicate higher resilience.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>set.seed(42)
+x &lt;- cumsum(rnorm(500))
+res &lt;- resilience(x, window = 50L)
+
+# Default classification with empirical state-aware scaling
+cls &lt;- classify_resilience(res)
+table(cls$composite_category)
+
+# Use percentile-based normalization
+cls_pct &lt;- classify_resilience(res, method = "percentile")
+
+# Custom weights emphasizing stability metrics
+cls_custom &lt;- classify_resilience(
+  res,
+  weights = c(vsi = 0.4, cv = 0.3, arch_lm = 0.1, ac_ratio = 0.05,
+              recovery_slope = 0.05, dfa_alpha = 0.04,
+              sample_entropy = 0.03, recovery_time = 0.03)
+)
+
+# Ribbon plot (requires classified data)
+plot(cls)</code></pre>
+  </div>
+</details>
+
+<!-- plot.resilience -->
+<h3 id="plot_resilience"><code>plot.resilience()</code></h3>
+<p>Use this function to visualize resilience analysis results. The <code>"ribbons"</code> type produces a time series line plot with gradient-colored horizontal bands below it&mdash;one per metric plus a composite band&mdash;that show how resilience evolves across time at a glance. Green indicates excellent resilience; red indicates troubled states. This is the primary diagnostic plot for communicating resilience dynamics. The <code>"lines"</code> type produces faceted raw metric trajectories, useful for understanding what each individual metric is doing before classification.</p>
+
+<div class="signature"><code>plot.resilience(x, type = "ribbons", ...)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>x</code></td><td>A <code>resilience</code> object. For <code>"ribbons"</code>, must have been processed by <code>classify_resilience()</code> first.</td><td>&mdash;</td></tr>
+    <tr><td><code>type</code></td><td>Plot type: <code>"ribbons"</code> (gradient risk bands below time series) or <code>"lines"</code> (faceted raw metric line plots).</td><td><code>"ribbons"</code></td></tr>
+    <tr><td><code>...</code></td><td>Additional arguments (currently unused).</td><td>&mdash;</td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>ggplot</code> object.</div>
+
+<div class="note">The ribbon plot (<code>type = "ribbons"</code>) requires classified data. Run <code>classify_resilience()</code> first. By default, recovery_time and recovery_slope ribbons are excluded for visual clarity; pass <code>show_metrics = "all"</code> to include them.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>set.seed(42)
+x &lt;- cumsum(rnorm(500))
+res &lt;- resilience(x, window = 50L)
+
+# Raw metric line plots (no classification needed)
+plot(res, type = "lines")
+
+# Ribbon plot (requires classification first)
+cls &lt;- classify_resilience(res)
+plot(cls, type = "ribbons")</code></pre>
+  </div>
+</details>
+
+<!-- ═══════════════ HURST ANALYSIS ═══════════════ -->
+<h2 id="hurst-analysis">Hurst Analysis</h2>
+
+<!-- hurst -->
+<h3 id="hurst"><code>hurst()</code></h3>
+<p>Use this function when you need to characterize the long-range dependence structure of a time series and track how it changes over time. The Hurst exponent (H) distinguishes three regimes: anti-persistent (H &lt; 0.5, mean-reverting), random walk (H = 0.5, no memory), and persistent (H &gt; 0.5, trend-reinforcing). By computing H in rolling windows with <code>states = TRUE</code>, you get a temporal map of regime transitions that feeds directly into early warning signal detection.</p>
+
+<p>Three estimation methods are available: DFA is the default because it is robust to non-stationarity and trends; R/S is the classic method useful for comparison; MFDFA extends the analysis to characterize multifractal structure, revealing whether the time series has uniform or heterogeneous scaling across different fluctuation magnitudes.</p>
+
+<div class="signature"><code>hurst(data, method = "dfa", window = 50L, step = 1L,
+      scaling = "none", min_scale = 4L, max_scale = NULL,
+      n_scales = 10L, q = seq(-5, 5, 0.5), states = TRUE)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>data</code></td><td>Univariate time series data. Accepts <code>ts</code> or <code>numeric</code> vector.</td><td>&mdash;</td></tr>
+    <tr><td><code>method</code></td><td>Hurst estimation method: <code>"dfa"</code> (Detrended Fluctuation Analysis, robust to trends), <code>"rs"</code> (Rescaled Range, classic method), or <code>"mfdfa"</code> (Multifractal DFA, characterizes the full multifractal spectrum).</td><td><code>"dfa"</code></td></tr>
+    <tr><td><code>window</code></td><td>Rolling window size for local Hurst estimation when <code>states = TRUE</code>. Must be at least <code>2 * min_scale</code>.</td><td><code>50</code></td></tr>
+    <tr><td><code>step</code></td><td>Step size between consecutive windows. Values &gt; 1 skip windows for faster computation on long series.</td><td><code>1</code></td></tr>
+    <tr><td><code>scaling</code></td><td>Preprocessing applied to the data before analysis: <code>"none"</code>, <code>"center"</code> (subtract mean), <code>"standardize"</code> (z-score), <code>"minmax"</code> (scale to [0,1]), or <code>"iqr"</code> (median/IQR normalization).</td><td><code>"none"</code></td></tr>
+    <tr><td><code>min_scale</code></td><td>Minimum box size for the DFA/R/S log-log regression. Must be at least 4.</td><td><code>4</code></td></tr>
+    <tr><td><code>max_scale</code></td><td>Maximum box size. If <code>NULL</code>, defaults to <code>floor(n/4)</code> for DFA/MFDFA or <code>floor(n/2)</code> for R/S.</td><td><code>NULL</code></td></tr>
+    <tr><td><code>n_scales</code></td><td>Number of logarithmically spaced scales between <code>min_scale</code> and <code>max_scale</code>. More scales improve regression accuracy but increase computation time.</td><td><code>10</code></td></tr>
+    <tr><td><code>q</code></td><td>Vector of moment orders for MFDFA. Only used when <code>method = "mfdfa"</code>. The standard Hurst is extracted at q=2. Wider ranges characterize the full multifractal spectrum.</td><td><code>seq(-5, 5, 0.5)</code></td></tr>
+    <tr><td><code>states</code></td><td>If <code>TRUE</code>, compute rolling Hurst values with five-state classification (strong_antipersistent, antipersistent, random_walk, persistent, strong_persistent). If <code>FALSE</code>, compute a single global Hurst estimate.</td><td><code>TRUE</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> If <code>states = TRUE</code>: an object of class <code>hurst</code> (tibble) with columns <code>time</code>, <code>value</code>, <code>hurst</code>, <code>r_squared</code>, <code>state</code>, and <code>transition</code>. For MFDFA, also includes <code>mf_width</code> and <code>mf_category</code>. Attributes store <code>window</code>, <code>step</code>, <code>method</code>, and <code>scaling</code>. If <code>states = FALSE</code>: an object of class <code>hurst_global</code> (list) with <code>hurst</code>, <code>r_squared</code>, <code>method</code>, <code>n</code>, and method-specific fields (<code>scales</code>, <code>fluctuations</code>/<code>rs_values</code>/<code>hq</code>/<code>tauq</code>/<code>mf_width</code>).</div>
+
+<h4>State Classification</h4>
+<table>
+  <thead><tr><th>Hurst Range</th><th>State</th><th>Interpretation</th></tr></thead>
+  <tbody>
+    <tr><td>H &lt; 0.4</td><td><code>strong_antipersistent</code></td><td>Strong mean-reversion; increases are likely followed by decreases</td></tr>
+    <tr><td>0.4 &le; H &lt; 0.5</td><td><code>antipersistent</code></td><td>Mild mean-reversion</td></tr>
+    <tr><td>0.5 &le; H &lt; 0.6</td><td><code>random_walk</code></td><td>No long-range memory; increments are uncorrelated</td></tr>
+    <tr><td>0.6 &le; H &lt; 0.7</td><td><code>persistent</code></td><td>Trends tend to continue; positive autocorrelation</td></tr>
+    <tr><td>H &ge; 0.7</td><td><code>strong_persistent</code></td><td>Strong trend reinforcement; long-range dependence</td></tr>
+  </tbody>
+</table>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>set.seed(42)
+x &lt;- cumsum(rnorm(500))
+
+# Rolling DFA with state classification
+h &lt;- hurst(x, method = "dfa", window = 50L)
+print(h)
+table(h$state)
+plot(h)
+
+# Global estimate (single number)
+h_global &lt;- hurst(x, method = "dfa", states = FALSE)
+print(h_global)
+
+# Rescaled Range method
+h_rs &lt;- hurst(x, method = "rs", window = 50L)
+
+# Multifractal DFA
+h_mf &lt;- hurst(x, method = "mfdfa", window = 80L)
+table(h_mf$mf_category)</code></pre>
+  </div>
+</details>
+
+<!-- plot.hurst -->
+<h3 id="plot_hurst"><code>plot.hurst()</code></h3>
+<p>Use this function to visualize Hurst exponent dynamics. The <code>"series"</code> panel shows the original time series with state-colored background bands, so you can see which regime the system was in at each point. The <code>"states"</code> panel shows the Hurst exponent trajectory with horizontal threshold bands marking the five state boundaries. The default <code>"both"</code> stacks these panels vertically for a complete picture of how regime changes in the Hurst domain correspond to features in the original signal.</p>
+
+<div class="signature"><code>plot.hurst(x, type = "both", ...)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>x</code></td><td>A <code>hurst</code> object as returned by <code>hurst()</code> with <code>states = TRUE</code>.</td><td>&mdash;</td></tr>
+    <tr><td><code>type</code></td><td>Plot type: <code>"series"</code> (time series with colored state background), <code>"states"</code> (Hurst trajectory with threshold bands), or <code>"both"</code> (both panels stacked).</td><td><code>"both"</code></td></tr>
+    <tr><td><code>...</code></td><td>Additional arguments (currently unused).</td><td>&mdash;</td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>ggplot</code> object (single panel) or a <code>patchwork</code> composite (when <code>type = "both"</code>).</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>set.seed(42)
+x &lt;- cumsum(rnorm(500))
+h &lt;- hurst(x, method = "dfa", window = 50L)
+
+# Full diagnostic: time series + Hurst trajectory
+plot(h, type = "both")
+
+# Just the Hurst trajectory with threshold bands
+plot(h, type = "states")
+
+# Just the time series with colored state background
+plot(h, type = "series")</code></pre>
+  </div>
+</details>
+
+<!-- ═══════════════ EARLY WARNING SIGNALS ═══════════════ -->
+<h2 id="early-warning">Early Warning Signals</h2>
+
+<!-- detect_hurst_warnings -->
+<h3 id="detect_hurst_warnings"><code>detect_hurst_warnings()</code></h3>
+<p>Use this function to detect early warning signals of critical transitions by analyzing temporal patterns in the Hurst exponent. It goes beyond the raw Hurst value by computing 10 binary indicators that capture different signatures of approaching instability: extreme values, significant trends, volatility bursts, flickering between states, variance ratio shifts, spectral changes, autocorrelation increases, and state persistence. These indicators are combined using a weighted scoring system with proximity enhancement to produce a graded warning level (0&ndash;4) at each time point.</p>
+
+<p>This approach detects transitions that a single Hurst threshold would miss, because real systems rarely transition cleanly&mdash;they flicker, exhibit intermittent trends, and show volatility clustering before a full regime shift.</p>
+
+<div class="signature"><code>detect_hurst_warnings(data, trend_window = 30L,
+                      volatility_window = 30L,
+                      flicker_window = 20L)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>data</code></td><td>A <code>hurst</code> object as returned by <code>hurst()</code> with <code>states = TRUE</code>. Must contain the rolling Hurst trajectory and state classifications.</td><td>&mdash;</td></tr>
+    <tr><td><code>trend_window</code></td><td>Window size for detecting significant trends in the Hurst exponent (5&ndash;n). The trend is tested via a slope t-test and must exceed a data-driven threshold.</td><td><code>30</code></td></tr>
+    <tr><td><code>volatility_window</code></td><td>Window size for measuring rolling RMSD of the Hurst exponent (5&ndash;n). The indicator fires when volatility exceeds the 90th percentile.</td><td><code>30</code></td></tr>
+    <tr><td><code>flicker_window</code></td><td>Window size for detecting flickering&mdash;rapid transitions between states (5&ndash;n). Fires when transition rate exceeds 20% of the window or when 3+ distinct states appear.</td><td><code>20</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> An object of class <code>hurst_ews</code> (tibble) containing the original Hurst data augmented with 10 binary indicator columns (<code>extreme_low</code>, <code>extreme_high</code>, <code>trend_up</code>, <code>trend_down</code>, <code>high_volatility</code>, <code>flickering</code>, <code>variance_ratio</code>, <code>spectral_shift</code>, <code>autocorr_increase</code>, <code>state_persistence</code>), a <code>warning_score</code> (0&ndash;1 normalized), <code>warning_level</code> (0&ndash;4 integer), and <code>warning_label</code> (none, low, moderate, high, critical).</div>
+
+<h4>EWS Indicators</h4>
+<table>
+  <thead><tr><th>Indicator</th><th>What it detects</th><th>Weight</th></tr></thead>
+  <tbody>
+    <tr><td><code>extreme_low</code></td><td>Hurst below 5th percentile (strong mean-reversion)</td><td>2.0</td></tr>
+    <tr><td><code>extreme_high</code></td><td>Hurst above 95th percentile (strong persistence)</td><td>2.0</td></tr>
+    <tr><td><code>trend_up</code></td><td>Statistically significant upward trend in Hurst</td><td>1.5</td></tr>
+    <tr><td><code>trend_down</code></td><td>Statistically significant downward trend in Hurst</td><td>1.5</td></tr>
+    <tr><td><code>high_volatility</code></td><td>Rolling RMSD of Hurst exceeds 90th percentile</td><td>1.5</td></tr>
+    <tr><td><code>flickering</code></td><td>Rapid state transitions or 3+ states in a short window</td><td>2.0</td></tr>
+    <tr><td><code>variance_ratio</code></td><td>Extreme deviation in multi-lag variance ratios</td><td>1.0</td></tr>
+    <tr><td><code>spectral_shift</code></td><td>Dominant spectral period increases by 50%+ vs. past</td><td>1.0</td></tr>
+    <tr><td><code>autocorr_increase</code></td><td>Recent lag-1&ndash;5 autocorrelation exceeds past by 0.2+</td><td>1.5</td></tr>
+    <tr><td><code>state_persistence</code></td><td>Current state run length exceeds 90th percentile</td><td>1.0</td></tr>
+  </tbody>
+</table>
+
+<div class="note"><strong>Warning levels:</strong> Level 0 = no indicators firing. Levels 1&ndash;4 are assigned via dynamic quantile thresholds (40th, 60th, 80th, 95th percentile of nonzero scores), so the thresholds adapt to each dataset. Proximity enhancement boosts scores where neighboring time points also have active warnings, reducing isolated false positives.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>set.seed(42)
+x &lt;- cumsum(rnorm(500))
+h &lt;- hurst(x, method = "dfa", window = 50L)
+
+# Detect early warning signals
+ews &lt;- detect_hurst_warnings(h)
+summary(ews)
+table(ews$warning_label)
+
+# Custom window sizes for more/less sensitive detection
+ews_sensitive &lt;- detect_hurst_warnings(
+  h,
+  trend_window = 20L,
+  volatility_window = 20L,
+  flicker_window = 10L
+)
+
+# Full diagnostic plot
+plot(ews)
+
+# Check which indicators are active at high-warning points
+high_warning &lt;- ews[ews$warning_level >= 3, ]
+colSums(high_warning[, c("extreme_low", "extreme_high", "trend_up",
+                          "trend_down", "high_volatility", "flickering")])</code></pre>
+  </div>
+</details>
+
+<!-- plot.hurst_ews -->
+<h3 id="plot_hurst_ews"><code>plot.hurst_ews()</code></h3>
+<p>Use this function to produce a three-panel diagnostic plot for early warning signal analysis. The top panel shows the Hurst exponent trajectory with color-coded warning level backgrounds. The middle panel shows the warning level as a step function (0&ndash;4). The bottom panel is an indicator heatmap showing which of the 10 binary indicators are firing at each time point. Together these panels let you diagnose not just when warnings occur, but why&mdash;which specific indicators are driving the elevated warning level.</p>
+
+<p>You can subset the indicators displayed in the heatmap to focus on the ones most relevant to your analysis (e.g., only trend and volatility indicators).</p>
+
+<div class="signature"><code>plot.hurst_ews(x, indicators = NULL, ...)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>x</code></td><td>A <code>hurst_ews</code> object as returned by <code>detect_hurst_warnings()</code>.</td><td>&mdash;</td></tr>
+    <tr><td><code>indicators</code></td><td>Character vector of indicator names to display in the heatmap panel. If <code>NULL</code>, all 10 indicators are shown. Valid names: <code>"extreme_low"</code>, <code>"extreme_high"</code>, <code>"trend_up"</code>, <code>"trend_down"</code>, <code>"high_volatility"</code>, <code>"flickering"</code>, <code>"variance_ratio"</code>, <code>"spectral_shift"</code>, <code>"autocorr_increase"</code>, <code>"state_persistence"</code>.</td><td><code>NULL</code></td></tr>
+    <tr><td><code>...</code></td><td>Additional arguments (currently unused).</td><td>&mdash;</td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>patchwork</code> composite of three ggplot panels stacked vertically (Hurst trajectory, warning level steps, indicator heatmap) with relative heights 2:1:3.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>set.seed(42)
+x &lt;- cumsum(rnorm(500))
+h &lt;- hurst(x, method = "dfa", window = 50L)
+ews &lt;- detect_hurst_warnings(h)
+
+# Full diagnostic plot with all indicators
+plot(ews)
+
+# Focus on trend and volatility indicators only
+plot(ews, indicators = c("trend_up", "trend_down",
+                          "high_volatility", "flickering"))
+
+# Focus on spectral/autocorrelation indicators
+plot(ews, indicators = c("spectral_shift", "autocorr_increase",
+                          "variance_ratio"))</code></pre>
+  </div>
+</details>
+
+<!-- ═══════════════ TREND ANALYSIS ═══════════════ -->
+<h2 id="trend-analysis">Trend Analysis</h2>
+
+<!-- compute_trend -->
+<h3 id="compute_trend"><code>compute_trend()</code></h3>
+<p>Use this function when you need to classify local time series behaviour into directional states&mdash;ascending, descending, flat, or turbulent&mdash;at every time point. Unlike a global trend test that gives you a single slope for the entire series, rolling-window classification reveals when and where the trend direction changes. This is the information you need for transition network analysis: the sequence of trend states becomes the input for modelling how a system moves between directional regimes.</p>
+
+<p>Three trend quantification methods let you match the metric to the data-generating process: <code>"slope"</code> (default) fits a rate of change via OLS, Theil-Sen, Spearman, or Kendall; <code>"ar1_phi1"</code> captures autoregressive momentum; <code>"growth_factor"</code> measures multiplicative change. After initial classification, a volatility-based turbulence detector re-classifies points where the trend metric itself is unstable, distinguishing genuine directional movement from noise-driven oscillation.</p>
+
+<div class="signature"><code>compute_trend(data, window = NULL, method = "slope",
+              slope_method = "robust", epsilon = 0.05,
+              turbulence_threshold = 5,
+              flat_to_turbulent_factor = 1.5,
+              min_points = 3L, align = "center")</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>data</code></td><td>Univariate time series data. Accepts a numeric vector or <code>ts</code> object.</td><td>&mdash;</td></tr>
+    <tr><td><code>window</code></td><td>Rolling window size. If <code>NULL</code>, an adaptive size is used: <code>max(3, min(n, round(n / 10)))</code>. Larger windows produce smoother classifications but lose temporal resolution.</td><td><code>NULL</code></td></tr>
+    <tr><td><code>method</code></td><td>Trend quantification: <code>"slope"</code> (rate of change), <code>"ar1_phi1"</code> (AR(1) coefficient), or <code>"growth_factor"</code> (last/first ratio). Slope is most general; AR(1) suits highly autocorrelated data; growth factor suits multiplicative processes.</td><td><code>"slope"</code></td></tr>
+    <tr><td><code>slope_method</code></td><td>Slope estimation sub-method (only when <code>method = "slope"</code>): <code>"ols"</code> (fast, outlier-sensitive), <code>"robust"</code> (Theil-Sen, robust to outliers), <code>"spearman"</code>, or <code>"kendall"</code> (rank-based). Theil-Sen is the default because real time series often have outliers.</td><td><code>"robust"</code></td></tr>
+    <tr><td><code>epsilon</code></td><td>Half-width of the flat classification band around the neutral value. Metric values within <code>neutral +/- epsilon</code> are classified as flat. Wider epsilon produces more flat classifications.</td><td><code>0.05</code></td></tr>
+    <tr><td><code>turbulence_threshold</code></td><td>Baseline volatility score above which a point is reclassified as turbulent. The volatility score combines the coefficient of variation and scaled range of the trend metric within a sub-window.</td><td><code>5</code></td></tr>
+    <tr><td><code>flat_to_turbulent_factor</code></td><td>Multiplier applied to <code>turbulence_threshold</code> for points already classified as flat. Values &gt; 1 make it harder to reclassify flat points as turbulent, introducing hysteresis that prevents minor noise from triggering false turbulence.</td><td><code>1.5</code></td></tr>
+    <tr><td><code>min_points</code></td><td>Minimum non-NA observations required in a window for a valid metric computation.</td><td><code>3</code></td></tr>
+    <tr><td><code>align</code></td><td>Window alignment: <code>"center"</code> (symmetric smoothing), <code>"right"</code> (causal, standard for real-time monitoring), or <code>"left"</code>.</td><td><code>"center"</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> An object of class <code>trend</code> (a tibble) with columns <code>time</code>, <code>value</code>, <code>metric</code> (the rolling trend metric), and <code>state</code> (factor with levels: ascending, descending, flat, turbulent, Missing_Data, Initial). Attributes store <code>window</code>, <code>align</code>, <code>method</code>, <code>slope_method</code>, and <code>epsilon</code>.</div>
+
+<h4>State Classification</h4>
+<table>
+  <thead><tr><th>State</th><th>Rule</th><th>Interpretation</th></tr></thead>
+  <tbody>
+    <tr><td><code>ascending</code></td><td>metric &gt; neutral + epsilon</td><td>Values are increasing within this window</td></tr>
+    <tr><td><code>descending</code></td><td>metric &lt; neutral - epsilon</td><td>Values are decreasing within this window</td></tr>
+    <tr><td><code>flat</code></td><td>metric within epsilon band</td><td>No meaningful directional movement</td></tr>
+    <tr><td><code>turbulent</code></td><td>volatility score exceeds threshold</td><td>Trend metric itself is unstable; direction is unreliable</td></tr>
+  </tbody>
+</table>
+
+<div class="note"><strong>Neutral values:</strong> The neutral value is 0 for <code>"slope"</code> and 1 for <code>"ar1_phi1"</code> and <code>"growth_factor"</code>. For slope, a metric of 0 means no change; for AR(1), a coefficient of 1 means a unit root; for growth factor, a ratio of 1 means no growth.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code># Basic trend classification with default settings
+set.seed(42)
+x &lt;- cumsum(rnorm(300, sd = 2))
+tr &lt;- compute_trend(x, window = 30)
+print(tr)
+table(tr$state)
+
+# AR(1) method for highly autocorrelated data
+tr_ar &lt;- compute_trend(x, window = 30, method = "ar1_phi1")
+
+# Tighter epsilon = fewer flat classifications
+tr_tight &lt;- compute_trend(x, window = 30, epsilon = 0.01)
+table(tr_tight$state)
+
+# Visualize with background shading
+plot(tr)
+
+# Ribbon-style plot
+plot(tr, type = "ribbons")
+
+# View summary statistics
+summary(tr)</code></pre>
+  </div>
+</details>
+
+<!-- plot.trend -->
+<h3 id="plot_trend"><code>plot.trend()</code></h3>
+<p>Use this function to visualize trend classification results. Two layouts show the same information in different ways: <code>"series"</code> (default) draws the time series with color-coded background tiles marking the trend state at each point, providing an immediate overlay of direction and trajectory. <code>"ribbons"</code> draws the time series in the upper portion with a compact colored ribbon bar below, matching the layout used by <code>plot.resilience()</code> so you can compare trend and resilience classifications side by side.</p>
+
+<div class="signature"><code>plot.trend(x, type = "series", ...)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>x</code></td><td>A <code>trend</code> object as returned by <code>compute_trend()</code>.</td><td>&mdash;</td></tr>
+    <tr><td><code>type</code></td><td>Plot type: <code>"series"</code> (background shading) or <code>"ribbons"</code> (ribbon bar beneath the time series).</td><td><code>"series"</code></td></tr>
+    <tr><td><code>...</code></td><td>Additional arguments (currently unused).</td><td>&mdash;</td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>ggplot</code> object. Green = ascending, red = descending, yellow = flat, blue = turbulent.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>set.seed(42)
+x &lt;- cumsum(rnorm(300, sd = 2))
+tr &lt;- compute_trend(x, window = 30)
+
+# Background-shaded time series (default)
+plot(tr)
+
+# Ribbon bar beneath the time series
+plot(tr, type = "ribbons")</code></pre>
+  </div>
+</details>
+
+<!-- ═══════════════ MULTIVARIATE EWS ═══════════════ -->
+<h2 id="multivariate-ews">Multivariate Early Warning Signals</h2>
+
+<!-- detect_multivariate_warnings -->
+<h3 id="detect_multivariate_warnings"><code>detect_multivariate_warnings()</code></h3>
+<p>Use this function when you have a system of multiple interacting variables and want to detect rising instability before a critical transition. Univariate EWS only capture what happens within a single variable; multivariate EWS capture coordinated changes across variables&mdash;the kind of system-wide patterns that precede tipping points in complex systems. The function computes 11 metrics based on Min/Max Autocorrelation Factors (MAF), Principal Component Analysis (PCA), and covariance structure, giving you both per-variable summaries (are individual variables becoming more volatile or persistent?) and dimension-reduction indicators (are variables becoming more correlated and acting as a coordinated unit?).</p>
+
+<p>Two analysis modes serve different use cases: <code>"rolling"</code> slides a fixed-width window across the series, standardizes each metric, and tests for upward trends using Kendall's tau&mdash;suitable for retrospective analysis where you want to know which metrics showed consistent increase. <code>"expanding"</code> grows the window from the start, applies double z-score standardization (matching the EWSmethods package), and flags threshold crossings in real time&mdash;suitable for online monitoring where you need to detect the moment a metric becomes anomalous.</p>
+
+<div class="signature"><code>detect_multivariate_warnings(data, time_col = NULL,
+                             metrics = "all",
+                             method = "rolling",
+                             window = 50,
+                             burn_in = 10L,
+                             threshold = 2,
+                             tail_direction = "one.tailed")</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>data</code></td><td>A data frame with a time column and at least two numeric time series columns. If <code>time_col</code> is not specified, the first column is assumed to be time.</td><td>&mdash;</td></tr>
+    <tr><td><code>time_col</code></td><td>Name of the time column. If <code>NULL</code>, the first column is used.</td><td><code>NULL</code></td></tr>
+    <tr><td><code>metrics</code></td><td>Which metrics to compute. Pass <code>"all"</code> for all 11, or a character vector subset of: <code>"meanSD"</code>, <code>"maxSD"</code>, <code>"meanAR"</code>, <code>"maxAR"</code>, <code>"eigenMAF"</code>, <code>"mafAR"</code>, <code>"mafSD"</code>, <code>"pcaAR"</code>, <code>"pcaSD"</code>, <code>"eigenCOV"</code>, <code>"maxCOV"</code>.</td><td><code>"all"</code></td></tr>
+    <tr><td><code>method</code></td><td>Analysis mode: <code>"rolling"</code> (fixed window, retrospective trend detection) or <code>"expanding"</code> (growing window, real-time threshold detection).</td><td><code>"rolling"</code></td></tr>
+    <tr><td><code>window</code></td><td>Window size as a <strong>percentage</strong> of total series length (for rolling mode). A value of 50 means each window covers 50% of the data. For expanding mode this is not used directly.</td><td><code>50</code></td></tr>
+    <tr><td><code>burn_in</code></td><td>Number of initial observations before warnings begin to be flagged (expanding mode only). Prevents false positives during the initial period when statistics are unstable.</td><td><code>10</code></td></tr>
+    <tr><td><code>threshold</code></td><td>Number of standard deviations for warning detection (expanding mode only). A metric's doubly-standardized value must exceed this threshold to be flagged.</td><td><code>2</code></td></tr>
+    <tr><td><code>tail_direction</code></td><td>Whether to test <code>"one.tailed"</code> (positive deviations only, standard for EWS) or <code>"two.tailed"</code> (both directions). Expanding mode only.</td><td><code>"one.tailed"</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> An object of class <code>multi_ews</code> (a tibble). <strong>Rolling</strong> columns: <code>time</code>, <code>metric</code>, <code>score</code>, <code>std</code> (z-scored). Attributes include <code>cor</code> (Kendall tau per metric) and <code>dimension_reduction</code> (MAF1/PC1 trajectories). <strong>Expanding</strong> columns: <code>time</code>, <code>metric</code>, <code>score</code>, <code>z_score</code>, <code>detected</code> (0/1). Attributes include <code>classification</code> (tibble with <code>time</code>, <code>count</code>, <code>state</code>) and <code>dimension_reduction</code>.</div>
+
+<h4>Available Metrics</h4>
+<table>
+  <thead><tr><th>Metric</th><th>Category</th><th>What rising values indicate</th></tr></thead>
+  <tbody>
+    <tr><td><code>meanSD</code></td><td>Per-variable</td><td>System-wide broadening fluctuations</td></tr>
+    <tr><td><code>maxSD</code></td><td>Per-variable</td><td>Any single variable becoming highly volatile</td></tr>
+    <tr><td><code>meanAR</code></td><td>Per-variable</td><td>System-wide critical slowing down</td></tr>
+    <tr><td><code>maxAR</code></td><td>Per-variable</td><td>Critical slowing down concentrated in one variable</td></tr>
+    <tr><td><code>eigenMAF</code></td><td>MAF</td><td>Rising spatial correlation across variables (sign-inverted)</td></tr>
+    <tr><td><code>mafAR</code></td><td>MAF</td><td>Slowest system mode becoming more persistent</td></tr>
+    <tr><td><code>mafSD</code></td><td>MAF</td><td>Slowest system mode amplifying (sign-inverted)</td></tr>
+    <tr><td><code>pcaAR</code></td><td>PCA</td><td>Dominant variance direction becoming more persistent</td></tr>
+    <tr><td><code>pcaSD</code></td><td>PCA</td><td>Dominant variance mode amplifying</td></tr>
+    <tr><td><code>eigenCOV</code></td><td>Covariance</td><td>Variance concentrating along one axis</td></tr>
+    <tr><td><code>maxCOV</code></td><td>Covariance</td><td>Strengthening cross-variable coupling</td></tr>
+  </tbody>
+</table>
+
+<h4>System State Classification (Expanding Mode)</h4>
+<table>
+  <thead><tr><th>State</th><th>Rule</th></tr></thead>
+  <tbody>
+    <tr><td><code>Stable</code></td><td>No metrics crossing the threshold</td></tr>
+    <tr><td><code>Vulnerable</code></td><td>1 metric crossing</td></tr>
+    <tr><td><code>Warning</code></td><td>2 metrics crossing</td></tr>
+    <tr><td><code>Critical</code></td><td>3 to half of all metrics crossing</td></tr>
+    <tr><td><code>Failing</code></td><td>More than half of all metrics crossing</td></tr>
+  </tbody>
+</table>
+
+<div class="note"><strong>Rolling vs. expanding:</strong> Rolling mode tells you which metrics showed consistent upward trends (Kendall tau &gt; 0.7 = strong trend). Expanding mode tells you when specific metrics became anomalous in real time. Use rolling for retrospective analysis and expanding for monitoring. Expanding mode is required for <code>to_tna()</code> export because it produces state classifications.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code># Generate multivariate data with a known tipping point
+tip &lt;- generate_tipping_data(
+  n_time = 200, n_vars = 5,
+  tipping_point = 120
+)
+
+# Rolling analysis: retrospective trend detection
+ews_roll &lt;- detect_multivariate_warnings(
+  tip, method = "rolling", window = 30
+)
+summary(ews_roll)
+plot(ews_roll)
+
+# Expanding analysis: real-time threshold detection
+ews_exp &lt;- detect_multivariate_warnings(
+  tip, method = "expanding",
+  threshold = 2, burn_in = 15
+)
+summary(ews_exp)
+plot(ews_exp)
+
+# Check system state distribution
+cls &lt;- attr(ews_exp, "classification")
+table(cls$state)
+
+# Export to TNA (expanding only)
+to_tna(ews_exp)</code></pre>
+  </div>
+</details>
+
+<!-- plot.multi_ews -->
+<h3 id="plot_multi_ews"><code>plot.multi_ews()</code></h3>
+<p>Use this function to produce multi-panel diagnostic plots for multivariate EWS results. The layout depends on the analysis method. For <strong>expanding</strong> windows, you get three stacked panels: (1) a dimension reduction panel showing MAF1 and PC1 trajectories with warning points highlighted, (2) the standardized metric strengths with threshold line(s) and detected crossings marked as points, and (3) a system-state classification ribbon (Stable through Failing). For <strong>rolling</strong> windows, you get faceted panels per metric showing standardized trends with Kendall's tau annotations, plus the dimension reduction panel.</p>
+
+<p>The dimension reduction panel (controlled by <code>include_dr</code>) summarizes the system's trajectory in two low-dimensional projections&mdash;the slowest mode (MAF1) and the highest-variance mode (PC1). When these diverge from their baseline, the system is changing in a coordinated way.</p>
+
+<div class="signature"><code>plot.multi_ews(x, include_dr = TRUE, ...)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>x</code></td><td>A <code>multi_ews</code> object as returned by <code>detect_multivariate_warnings()</code>.</td><td>&mdash;</td></tr>
+    <tr><td><code>include_dr</code></td><td>Whether to include the MAF1/PC1 dimension reduction panel. Set to <code>FALSE</code> to show only the metric panels.</td><td><code>TRUE</code></td></tr>
+    <tr><td><code>...</code></td><td>Additional arguments (currently unused).</td><td>&mdash;</td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>patchwork</code> composite of stacked ggplot panels. Expanding layout heights: dimension reduction (2) : metrics (4) : classification ribbon (1). Rolling layout heights: dimension reduction (2) : faceted metrics (3.5).</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>tip &lt;- generate_tipping_data(n_time = 200, n_vars = 5)
+
+# Expanding: full diagnostic with dimension reduction
+ews &lt;- detect_multivariate_warnings(tip, method = "expanding")
+plot(ews)
+
+# Without dimension reduction panel
+plot(ews, include_dr = FALSE)
+
+# Rolling: faceted metrics with Kendall's tau
+ews_roll &lt;- detect_multivariate_warnings(tip, method = "rolling")
+plot(ews_roll)</code></pre>
+  </div>
+</details>
+
+<!-- ═══════════════ CHANGEPOINT DETECTION ═══════════════ -->
+<h2 id="changepoint-detection">Changepoint Detection</h2>
+
+<!-- detect_changepoints -->
+<h3 id="detect_changepoints"><code>detect_changepoints()</code></h3>
+<p>Use this function when you need to locate abrupt structural breaks in a time series&mdash;mean shifts, variance changes, or both simultaneously. Unlike <code>compute_trend()</code> which classifies the local direction at each point, changepoint detection finds the <em>exact moments</em> where the statistical properties of the series change. This matters because resilience metrics and EWS indicators can be misleading when computed across a structural break: a window that straddles a mean shift produces artificially inflated variance and autocorrelation. Knowing where the breaks are lets you interpret other analyses correctly.</p>
+
+<p>Three algorithms are available: CUSUM finds a single changepoint using cumulative sum statistics; binary segmentation recursively splits segments (fast, approximate); PELT uses dynamic programming to find the optimal set of changepoints with a penalty (exact, linear cost). BIC and AIC penalties control model complexity&mdash;higher penalties produce fewer changepoints.</p>
+
+<div class="signature"><code>detect_changepoints(data, method = "cusum", penalty = "bic",
+                    min_segment = 10L, max_changepoints = NULL,
+                    type = "mean", penalty_value = NULL)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>data</code></td><td>Numeric vector or <code>ts</code> object. Parsed via <code>prepare_timeseries_data()</code>.</td><td>&mdash;</td></tr>
+    <tr><td><code>method</code></td><td>Algorithm: <code>"cusum"</code> (single changepoint via CUSUM statistic), <code>"binary_segmentation"</code> (recursive splitting), or <code>"pelt"</code> (optimal partitioning with linear cost).</td><td><code>"cusum"</code></td></tr>
+    <tr><td><code>penalty</code></td><td>Model selection penalty: <code>"bic"</code> (Bayesian Information Criterion), <code>"aic"</code> (Akaike), or <code>"manual"</code> (user-specified via <code>penalty_value</code>).</td><td><code>"bic"</code></td></tr>
+    <tr><td><code>min_segment</code></td><td>Minimum number of observations between consecutive changepoints. Prevents spurious detections in short segments.</td><td><code>10</code></td></tr>
+    <tr><td><code>max_changepoints</code></td><td>Maximum number of changepoints to detect. If <code>NULL</code>, no limit is imposed (the penalty controls complexity). Applies only to binary segmentation and PELT.</td><td><code>NULL</code></td></tr>
+    <tr><td><code>type</code></td><td>Type of change to detect: <code>"mean"</code>, <code>"variance"</code>, or <code>"both"</code>.</td><td><code>"mean"</code></td></tr>
+    <tr><td><code>penalty_value</code></td><td>Manual penalty value. Only used when <code>penalty = "manual"</code>.</td><td><code>NULL</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>changepoint</code> tibble with columns: <code>time</code>, <code>value</code>, <code>segment</code> (sequential integer ID), <code>regime</code> (smart regime ID&mdash;segments with similar means share the same number), <code>segment_mean</code>, <code>segment_var</code>, <code>level</code> (factor: low/medium/high relative to overall mean &plusmn; 0.5 SD), <code>direction</code> (factor: lower/no_change/higher from previous segment), <code>magnitude</code> (numeric shift from previous segment mean), <code>changepoint_type</code> (character: "change" for new regime, "return" for revisited regime&mdash;only at changepoint rows), <code>state</code> (factor combining level and changepoint type, e.g., high_change, low_return, medium_initial), <code>changepoint</code> (logical). Attributes: <code>method</code>, <code>penalty</code>, <code>min_segment</code>, <code>max_changepoints</code>, <code>type</code>, <code>n_changepoints</code>, <code>changepoint_locations</code>.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code># Mean shift at t = 200
+set.seed(42)
+x &lt;- c(rnorm(200, 0, 1), rnorm(200, 5, 1))
+cp &lt;- detect_changepoints(x, method = "pelt")
+cp
+summary(cp)
+
+# Multiple changepoints
+set.seed(123)
+y &lt;- c(rnorm(100, 0), rnorm(100, 3), rnorm(100, -1), rnorm(100, 4))
+cp2 &lt;- detect_changepoints(y, method = "binary_segmentation")
+plot(cp2, type = "both")</code></pre>
+  </div>
+</details>
+
+<!-- plot.changepoint -->
+<h3 id="plot_changepoint"><code>plot.changepoint()</code></h3>
+<p>Visualises the changepoint analysis results. The <code>"series"</code> view colours each segment differently and draws red dashed vertical lines at changepoint locations. The <code>"diagnostics"</code> view overlays the segment mean step function on the original data, revealing whether the detected means actually track the structural levels. Use <code>"both"</code> to stack both panels when presenting results.</p>
+
+<div class="signature"><code>plot(x, type = "series", ...)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>x</code></td><td>A <code>changepoint</code> object from <code>detect_changepoints()</code>.</td><td>&mdash;</td></tr>
+    <tr><td><code>type</code></td><td><code>"series"</code> (coloured segments + changepoint lines), <code>"diagnostics"</code> (segment mean step function), or <code>"both"</code> (stacked).</td><td><code>"series"</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>ggplot</code> object or <code>patchwork</code> composite.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>cp &lt;- detect_changepoints(x, method = "pelt")
+plot(cp)                    # coloured segments
+plot(cp, type = "diagnostics")  # segment means
+plot(cp, type = "both")     # stacked</code></pre>
+  </div>
+</details>
+
+<!-- ═══════════════ SPECTRAL EWS ═══════════════ -->
+<h2 id="spectral-ews">Spectral EWS</h2>
+
+<!-- spectral_ews -->
+<h3 id="spectral_ews"><code>spectral_ews()</code></h3>
+<p>Use this function when you want to detect shifts in the noise colour of a time series as an early warning of critical transitions. Near a tipping point, power shifts from high to low frequencies&mdash;the spectral exponent increases from white noise (~0) through pink (~1) and red (~2) toward Brownian motion (>2.5). This spectral "reddening" is a complementary EWS to rising autocorrelation and variance because it captures the same phenomenon (critical slowing down) through a frequency-domain lens, which can be more robust when the time-domain signals are ambiguous.</p>
+
+<p>The function slides a rolling window across the series, fits a log-log regression of power vs. frequency to each window segment, and extracts the spectral exponent (slope) and spectral ratio (low-to-high frequency power). When <code>states = TRUE</code>, each time point is classified into one of four noise-colour categories based on the exponent value.</p>
+
+<div class="signature"><code>spectral_ews(data, window = 50L, align = "right",
+             method = "periodogram", detrend = "linear",
+             states = TRUE, min_points = 20L)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>data</code></td><td>Numeric vector or <code>ts</code> object.</td><td>&mdash;</td></tr>
+    <tr><td><code>window</code></td><td>Rolling window size in observations.</td><td><code>50</code></td></tr>
+    <tr><td><code>align</code></td><td>Window alignment: <code>"right"</code>, <code>"center"</code>, or <code>"left"</code>.</td><td><code>"right"</code></td></tr>
+    <tr><td><code>method</code></td><td>Spectral estimation: <code>"periodogram"</code> (raw periodogram via <code>stats::spectrum()</code>) or <code>"ar"</code> (autoregressive spectral estimate).</td><td><code>"periodogram"</code></td></tr>
+    <tr><td><code>detrend</code></td><td>Detrending applied per window: <code>"none"</code>, <code>"linear"</code> (OLS residuals), or <code>"diff"</code> (first-difference).</td><td><code>"linear"</code></td></tr>
+    <tr><td><code>states</code></td><td>If <code>TRUE</code>, classify each point into a noise-colour state based on the spectral exponent.</td><td><code>TRUE</code></td></tr>
+    <tr><td><code>min_points</code></td><td>Minimum non-NA observations in a window for spectral estimation.</td><td><code>20</code></td></tr>
+  </tbody>
+</table>
+
+<h4>Noise-Colour State Classification</h4>
+<table>
+  <thead><tr><th>State</th><th>Spectral Exponent Range</th><th>Interpretation</th></tr></thead>
+  <tbody>
+    <tr><td><code>white_noise</code></td><td>&lt; 0.5</td><td>Uncorrelated random fluctuations</td></tr>
+    <tr><td><code>pink_noise</code></td><td>0.5 &ndash; 1.5</td><td>1/f noise, balanced across scales</td></tr>
+    <tr><td><code>red_noise</code></td><td>1.5 &ndash; 2.5</td><td>Strong low-frequency power, approaching transition</td></tr>
+    <tr><td><code>brownian</code></td><td>&ge; 2.5</td><td>Brownian motion, dominated by drift</td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>spectral</code> tibble with columns: <code>time</code>, <code>value</code>, <code>spectral_exponent</code>, <code>spectral_ratio</code>, <code>r_squared</code>, <code>state</code> (when <code>states = TRUE</code>). Attributes: <code>window</code>, <code>align</code>, <code>method</code>, <code>detrend</code>.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>set.seed(42)
+x &lt;- cumsum(rnorm(500))
+sp &lt;- spectral_ews(x, window = 50)
+sp
+summary(sp)
+plot(sp)</code></pre>
+  </div>
+</details>
+
+<!-- plot.spectral -->
+<h3 id="plot_spectral"><code>plot.spectral()</code></h3>
+<p>Visualises rolling spectral analysis results. The <code>"series"</code> view shows the time series with state-coloured backgrounds (noise-colour bands). The <code>"states"</code> view plots the spectral exponent trajectory against threshold bands, revealing trends toward reddening. Use <code>"both"</code> to see both panels stacked, which makes the connection between noise-colour shifts and the original dynamics visible.</p>
+
+<div class="signature"><code>plot(x, type = "both", ...)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>x</code></td><td>A <code>spectral</code> object from <code>spectral_ews()</code>.</td><td>&mdash;</td></tr>
+    <tr><td><code>type</code></td><td><code>"series"</code> (state-coloured background), <code>"states"</code> (exponent trajectory + bands), or <code>"both"</code> (stacked).</td><td><code>"both"</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>ggplot</code> object or <code>patchwork</code> composite.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>sp &lt;- spectral_ews(x, window = 50)
+plot(sp, type = "series")
+plot(sp, type = "states")
+plot(sp, type = "both")</code></pre>
+  </div>
+</details>
+
+<!-- ═══════════════ POTENTIAL ANALYSIS ═══════════════ -->
+<h2 id="potential-analysis">Potential Analysis</h2>
+
+<!-- potential_analysis -->
+<h3 id="potential_analysis"><code>potential_analysis()</code></h3>
+<p>Use this function when you want to characterise the stability landscape of a time series&mdash;how many stable states (wells) exist, where they are located, and how deep the barriers between them are. The quasi-potential U(x) = -log(P(x)) is estimated from the kernel density: minima correspond to stable attractors (wells) and maxima to unstable equilibria (barriers). A system with one well is stable; the appearance of a second well signals an alternative stable state that the system could tip into.</p>
+
+<p>In global mode (no <code>window</code>), a single landscape is estimated from the entire series. In rolling mode (with <code>window</code>), the landscape is re-estimated for each window position, producing a time-varying topology: the number of wells at each time point reveals <em>when</em> alternative stable states appear or disappear, which is a direct indicator of approaching bifurcations.</p>
+
+<div class="signature"><code>potential_analysis(data, window = NULL, n_bins = 50L,
+                   bandwidth = NULL, detrend = "none")</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>data</code></td><td>Numeric vector or <code>ts</code> object.</td><td>&mdash;</td></tr>
+    <tr><td><code>window</code></td><td>Rolling window size. If <code>NULL</code>, a single global landscape is estimated. If specified, the landscape is re-estimated per window.</td><td><code>NULL</code></td></tr>
+    <tr><td><code>n_bins</code></td><td>Number of bins for the kernel density grid. The actual grid resolution is <code>n_bins * 4</code> for smooth interpolation.</td><td><code>50</code></td></tr>
+    <tr><td><code>bandwidth</code></td><td>Kernel density bandwidth. If <code>NULL</code>, uses Silverman's rule of thumb.</td><td><code>NULL</code></td></tr>
+    <tr><td><code>detrend</code></td><td>Detrending before landscape estimation: <code>"none"</code>, <code>"linear"</code>, or <code>"diff"</code>.</td><td><code>"none"</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>potential</code> list containing: <code>landscape</code> (tibble with <code>x</code>, <code>density</code>, <code>potential</code>; global mode only), <code>wells</code> (tibble with <code>location</code>, <code>depth</code>, <code>width</code>; global mode only), <code>barriers</code> (tibble with <code>location</code>, <code>height</code>; global mode only), <code>n_wells</code>, <code>values</code>, <code>time</code>, <code>rolling</code> (tibble with <code>time</code>, <code>value</code>, <code>n_wells</code>, <code>dominant_well_location</code>; rolling mode only). Attributes: <code>n_bins</code>, <code>bandwidth</code>, <code>detrend</code>, <code>window</code>.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code># Single well: Ornstein-Uhlenbeck process
+set.seed(42)
+n &lt;- 2000
+x &lt;- numeric(n)
+for (i in 2:n) x[i] &lt;- x[i-1] - 0.5 * x[i-1] * 0.01 + 0.3 * rnorm(1)
+pa &lt;- potential_analysis(x)
+plot(pa)
+
+# Two wells: bimodal mixture
+bimodal &lt;- c(rnorm(1000, -2, 0.5), rnorm(1000, 2, 0.5))
+pa2 &lt;- potential_analysis(bimodal)
+summary(pa2)
+plot(pa2, type = "both")
+
+# Rolling mode: track topology changes
+pa_roll &lt;- potential_analysis(cumsum(rnorm(500)), window = 100)
+plot(pa_roll)</code></pre>
+  </div>
+</details>
+
+<!-- plot.potential -->
+<h3 id="plot_potential"><code>plot.potential()</code></h3>
+<p>Visualises the estimated stability landscape. The <code>"landscape"</code> view shows the quasi-potential U(x) with wells and barriers marked. The <code>"density"</code> view shows the underlying probability density. For rolling-mode objects, the plot additionally shows the number of wells over time, revealing when alternative stable states appear or disappear.</p>
+
+<div class="signature"><code>plot(x, type = "landscape", ...)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>x</code></td><td>A <code>potential</code> object from <code>potential_analysis()</code>.</td><td>&mdash;</td></tr>
+    <tr><td><code>type</code></td><td><code>"landscape"</code> (potential curve with wells/barriers), <code>"density"</code> (probability density), or <code>"both"</code> (stacked).</td><td><code>"landscape"</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>ggplot</code> object or <code>patchwork</code> composite.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>pa &lt;- potential_analysis(bimodal)
+plot(pa, type = "landscape")
+plot(pa, type = "density")
+plot(pa, type = "both")</code></pre>
+  </div>
+</details>
+
+<!-- ═══════════════ SURROGATE TESTING ═══════════════ -->
+<h2 id="surrogate-testing">Surrogate Testing</h2>
+
+<!-- surrogate_test -->
+<h3 id="surrogate_test"><code>surrogate_test()</code></h3>
+<p>Use this function when you need to know whether an observed trend in an EWS metric (rising AR(1), increasing variance, etc.) is statistically significant or could have arisen by chance. The function generates <code>n_surrogates</code> synthetic series that preserve specified properties of the original (power spectrum, amplitude distribution, local correlation structure) while destroying the temporal trend, then computes the same rolling metric and its Kendall tau for each surrogate. The observed tau is compared against this null distribution to yield a p-value.</p>
+
+<p>This is critical for publication: reporting "AR(1) shows an increasing trend" is meaningless without establishing that the trend is unlikely under the null hypothesis of no systematic change. Four surrogate methods are available: phase randomization (preserves power spectrum), shuffle (complete randomization), AAFT (preserves both spectrum and amplitude distribution), and block bootstrap (preserves local autocorrelation).</p>
+
+<div class="signature"><code>surrogate_test(data, n_surrogates = 100L, method = "phase",
+               metric = "ar1", window = 50L, test = "trend")</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>data</code></td><td>Numeric vector or <code>ts</code> object.</td><td>&mdash;</td></tr>
+    <tr><td><code>n_surrogates</code></td><td>Number of surrogate series to generate. Higher values give more precise p-values (100&ndash;1000 typical).</td><td><code>100</code></td></tr>
+    <tr><td><code>method</code></td><td>Surrogate generation: <code>"phase"</code> (FFT phase randomization), <code>"shuffle"</code> (random permutation), <code>"aaft"</code> (Amplitude-Adjusted Fourier Transform), or <code>"block"</code> (block bootstrap, block length = sqrt(n)).</td><td><code>"phase"</code></td></tr>
+    <tr><td><code>metric</code></td><td>Rolling-window metric to track: <code>"ar1"</code>, <code>"sd"</code>, <code>"skewness"</code>, <code>"kurtosis"</code>, <code>"spectral_exponent"</code>, or <code>"hurst"</code>.</td><td><code>"ar1"</code></td></tr>
+    <tr><td><code>window</code></td><td>Rolling window size for computing the metric.</td><td><code>50</code></td></tr>
+    <tr><td><code>test</code></td><td>Test statistic. Currently only <code>"trend"</code> (Kendall's tau of the rolling metric against time).</td><td><code>"trend"</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>surrogate_test</code> list containing: <code>observed_tau</code> (Kendall's tau for the original), <code>observed_metric</code> (rolling metric vector), <code>surrogate_taus</code> (vector of length <code>n_surrogates</code>), <code>surrogate_metrics</code> (matrix), <code>p_value</code> (one-sided), <code>significant</code> (logical, p &lt; 0.05), <code>metric</code>, <code>method</code>, <code>n_surrogates</code>, <code>window</code>, <code>test</code>.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>set.seed(42)
+x &lt;- cumsum(rnorm(300)) + seq(0, 5, length.out = 300)
+st &lt;- surrogate_test(x, n_surrogates = 50, metric = "ar1", window = 30)
+print(st)
+summary(st)
+plot(st)</code></pre>
+  </div>
+</details>
+
+<!-- plot.surrogate_test -->
+<h3 id="plot_surrogate"><code>plot.surrogate_test()</code></h3>
+<p>Visualises surrogate test results. The <code>"histogram"</code> view shows the null distribution of surrogate Kendall taus with the observed value marked as a red vertical line, making it visually obvious whether the observed trend is in the tails of the null. The <code>"envelope"</code> view plots the observed rolling metric against the 95% surrogate envelope (shaded band), revealing where and when the observed metric departs from chance expectation.</p>
+
+<div class="signature"><code>plot(x, type = "both", ...)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>x</code></td><td>A <code>surrogate_test</code> object from <code>surrogate_test()</code>.</td><td>&mdash;</td></tr>
+    <tr><td><code>type</code></td><td><code>"histogram"</code> (null distribution + observed tau), <code>"envelope"</code> (metric trajectory + 95% band), or <code>"both"</code> (stacked).</td><td><code>"both"</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>ggplot</code> object or <code>patchwork</code> composite.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>st &lt;- surrogate_test(x, n_surrogates = 50, metric = "ar1", window = 30)
+plot(st, type = "histogram")
+plot(st, type = "envelope")
+plot(st, type = "both")</code></pre>
+  </div>
+</details>
+
+<!-- ═══════════════ SENSITIVITY ANALYSIS ═══════════════ -->
+<h2 id="sensitivity-analysis">Sensitivity Analysis</h2>
+
+<!-- sensitivity_ews -->
+<h3 id="sensitivity_ews"><code>sensitivity_ews()</code></h3>
+<p>Use this function when you need to know whether your EWS results are robust to the choice of analysis parameters or are artifacts of a particular window size or detrending method. It sweeps across a grid of window sizes and detrending methods, computes the rolling metric and its Kendall tau for each combination, and produces a robustness matrix. If the tau values are consistently positive across the parameter space, the EWS trend is robust; if they flip sign depending on the window size, the result is fragile and should not be trusted.</p>
+
+<p>This is the standard robustness check recommended by Dakos et al. (2012): before reporting that an EWS metric shows a significant increasing trend, you should demonstrate that the trend holds across a range of reasonable parameter choices.</p>
+
+<div class="signature"><code>sensitivity_ews(data, metric = "ar1", windows = NULL,
+                detrend_methods = c("none", "linear"),
+                method = "rolling")</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>data</code></td><td>Numeric vector or <code>ts</code> object.</td><td>&mdash;</td></tr>
+    <tr><td><code>metric</code></td><td>EWS metric to test: <code>"ar1"</code>, <code>"sd"</code>, <code>"variance"</code>, <code>"skewness"</code>, <code>"kurtosis"</code>, or <code>"cv"</code>.</td><td><code>"ar1"</code></td></tr>
+    <tr><td><code>windows</code></td><td>Vector of window sizes to evaluate. If <code>NULL</code>, a default sequence of 8 sizes is generated spanning <code>max(20, n/20)</code> to <code>min(n/2, 200)</code>.</td><td><code>NULL</code></td></tr>
+    <tr><td><code>detrend_methods</code></td><td>Detrending methods to compare: <code>"none"</code> (raw series) and/or <code>"linear"</code> (OLS residuals).</td><td><code>c("none", "linear")</code></td></tr>
+    <tr><td><code>method</code></td><td>Analysis method. Currently only <code>"rolling"</code>.</td><td><code>"rolling"</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>sensitivity_ews</code> tibble with columns: <code>window</code>, <code>detrend</code>, <code>time</code>, <code>score</code>, <code>tau</code> (Kendall's tau for each parameter combination). Attributes: <code>metric</code>, <code>windows</code>, <code>detrend_methods</code>.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>set.seed(42)
+x &lt;- cumsum(rnorm(300, sd = seq(0.5, 2, length.out = 300)))
+sa &lt;- sensitivity_ews(x, metric = "ar1")
+sa
+summary(sa)
+plot(sa, type = "heatmap")</code></pre>
+  </div>
+</details>
+
+<!-- plot.sensitivity_ews -->
+<h3 id="plot_sensitivity"><code>plot.sensitivity_ews()</code></h3>
+<p>Visualises the sensitivity analysis results. The <code>"heatmap"</code> view shows Kendall's tau as a coloured tile across all window &times; detrend combinations&mdash;green tiles indicate robust positive trends, red tiles indicate fragile or negative trends. The <code>"lines"</code> view facets the metric trajectories by parameter combination, showing the actual score time series for each setting.</p>
+
+<div class="signature"><code>plot(x, type = "heatmap", ...)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>x</code></td><td>A <code>sensitivity_ews</code> object from <code>sensitivity_ews()</code>.</td><td>&mdash;</td></tr>
+    <tr><td><code>type</code></td><td><code>"heatmap"</code> (tau tile plot), <code>"lines"</code> (faceted metric trajectories), or <code>"both"</code> (stacked).</td><td><code>"heatmap"</code></td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A <code>ggplot</code> object or <code>patchwork</code> composite.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>sa &lt;- sensitivity_ews(x, metric = "ar1")
+plot(sa, type = "heatmap")
+plot(sa, type = "lines")
+plot(sa, type = "both")</code></pre>
+  </div>
+</details>
+
+<!-- ═══════════════ TNA INTEROPERABILITY ═══════════════ -->
+<h2 id="tna-interop">TNA Interoperability</h2>
+
+<!-- to_tna -->
+<h3 id="to_tna"><code>to_tna()</code></h3>
+<p>Use this function when you want to convert the categorical state trajectory from any analysis into a format that <code>tna::tna()</code> can model as a transition network. Every analysis in the toolkit produces a state ribbon over time&mdash;resilience categories, Hurst memory regimes, warning levels, trend directions, spectral noise colors, changepoint segments, or potential landscape stability states. <code>to_tna()</code> extracts that state sequence and reshapes it into a single-row wide-format tibble with columns <code>T1, T2, T3, ...</code>, which is exactly the input format that <code>tna::tna()</code> expects for building transition probability matrices.</p>
+
+<p>This function is the bridge between temporal analysis (what state is the system in at each time point?) and network analysis (how does the system transition between states?). The pattern is always <code>tna::tna(to_tna(analysis_object))</code>&mdash;one line to go from a classified time series to a transition network model.</p>
+
+<div class="signature"><code>to_tna(x, ...)
+
+# S3 methods:
+to_tna.resilience(x, state = "composite", ...)
+to_tna.hurst(x, state = "state", ...)
+to_tna.hurst_ews(x, state = "warning_label", ...)
+to_tna.multi_ews(x, ...)
+to_tna.trend(x, ...)
+to_tna.changepoint(x, state = "state", ...)
+to_tna.spectral(x, ...)
+to_tna.potential(x, ...)</code></div>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td><code>x</code></td><td>An analysis object from any supported class (see Supported Classes table below).</td><td>&mdash;</td></tr>
+    <tr><td><code>state</code></td><td>Which state column to extract (resilience, hurst, hurst_ews, and changepoint methods only). For <code>resilience</code>: <code>"composite"</code> extracts the composite category, or pass a metric name (e.g., <code>"vsi"</code>) to extract that metric's category. For <code>hurst</code>: <code>"state"</code> (memory states) or <code>"mf_category"</code> (multifractal categories, MFDFA only). For <code>hurst_ews</code>: <code>"warning_label"</code> (warning levels) or <code>"state"</code> (underlying Hurst states). For <code>changepoint</code>: <code>"state"</code> (default, level_type combinations like high_change, low_return), <code>"level"</code> (high/medium/low), <code>"direction"</code> (higher/lower/no_change), <code>"regime"</code> (regime_1, regime_2, ...), or <code>"segment"</code> (segment_1, segment_2, ...).</td><td>Varies by class</td></tr>
+    <tr><td><code>...</code></td><td>Additional arguments (currently unused).</td><td>&mdash;</td></tr>
+  </tbody>
+</table>
+
+<div class="returns"><strong>Returns:</strong> A single-row tibble with character columns <code>T1, T2, T3, ...</code> Each column contains the state label at that time point. Pass directly to <code>tna::tna()</code> for transition network modelling.</div>
+
+<h4>Supported Classes</h4>
+<table>
+  <thead><tr><th>Class</th><th>Created by</th><th>State labels</th><th>Requirements</th></tr></thead>
+  <tbody>
+    <tr><td><code>resilience</code></td><td><code>classify_resilience()</code></td><td>Excellent, Solid, Fair, Vulnerable, Failing, Troubled</td><td>Must run <code>classify_resilience()</code> first</td></tr>
+    <tr><td><code>hurst</code></td><td><code>hurst()</code></td><td>strong_antipersistent, antipersistent, random_walk, persistent, strong_persistent</td><td><code>states = TRUE</code> required</td></tr>
+    <tr><td><code>hurst_ews</code></td><td><code>detect_hurst_warnings()</code></td><td>none, low, moderate, high, critical</td><td>&mdash;</td></tr>
+    <tr><td><code>multi_ews</code></td><td><code>detect_multivariate_warnings()</code></td><td>Stable, Vulnerable, Warning, Critical, Failing</td><td><code>method = "expanding"</code> required</td></tr>
+    <tr><td><code>trend</code></td><td><code>compute_trend()</code></td><td>ascending, descending, flat, turbulent</td><td>&mdash;</td></tr>
+    <tr><td><code>changepoint</code></td><td><code>detect_changepoints()</code></td><td>high_change, low_return, medium_initial, ... (default <code>state</code>); also <code>"level"</code>, <code>"direction"</code>, <code>"regime"</code>, <code>"segment"</code></td><td>&mdash;</td></tr>
+    <tr><td><code>spectral</code></td><td><code>spectral_ews()</code></td><td>white_noise, pink_noise, red_noise, brownian</td><td><code>states = TRUE</code> required</td></tr>
+    <tr><td><code>potential</code></td><td><code>potential_analysis()</code></td><td>flat, unimodal, bimodal, multimodal</td><td><code>window</code> argument required (rolling mode)</td></tr>
+  </tbody>
+</table>
+
+<div class="note"><strong>Unsupported classes:</strong> <code>hurst_global</code> (single global estimate, no time sequence), <code>surrogate_test</code> (significance statistics, not states), and <code>sensitivity_ews</code> (robustness metrics, not states) produce informative errors explaining how to get a supported object. Rolling-window <code>multi_ews</code> objects also produce an error because they don't classify system states.</div>
+
+<details>
+  <summary>Example</summary>
+  <div class="detail-content">
+<pre><code>set.seed(42)
+x &lt;- cumsum(rnorm(300))
+
+# Trend states -> TNA
+tr &lt;- compute_trend(x, window = 30)
+to_tna(tr)
+# tna::tna(to_tna(tr))  # build transition network
+
+# Resilience categories -> TNA
+res &lt;- resilience(x, window = 50)
+cls &lt;- classify_resilience(res)
+to_tna(cls)                     # composite categories
+to_tna(cls, state = "vsi")      # per-metric categories
+
+# Hurst memory states -> TNA
+h &lt;- hurst(x, method = "dfa", window = 50, step = 10)
+to_tna(h)
+
+# EWS warning levels -> TNA
+ews &lt;- detect_hurst_warnings(h)
+to_tna(ews)
+
+# Multivariate EWS system states -> TNA (expanding only)
+tip &lt;- generate_tipping_data(n_time = 100, n_vars = 3)
+mews &lt;- detect_multivariate_warnings(tip, method = "expanding")
+to_tna(mews)
+
+# Changepoint segment sequences -> TNA
+cp &lt;- detect_changepoints(x, method = "pelt")
+to_tna(cp)
+
+# Spectral noise-colour sequences -> TNA
+sp &lt;- spectral_ews(x, window = 50, states = TRUE)
+to_tna(sp)
+
+# Potential stability states -> TNA (rolling mode)
+pot &lt;- potential_analysis(x, window = 100)
+to_tna(pot)</code></pre>
+  </div>
+</details>
+
+<!-- ── Footer ── -->
+<hr style="margin-top: 3rem;">
+<p style="font-size: 0.85rem; color: var(--muted); margin-top: 1rem;">
+  <strong>Resilience &amp; Hurst Toolkit</strong> | codyna extension | Mohammed Saqr
+</p>
+
+</div>
+</body>
+</html>

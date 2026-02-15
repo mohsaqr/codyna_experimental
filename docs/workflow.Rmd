@@ -1,0 +1,862 @@
+---
+title: "Resilience Analysis Workflow"
+subtitle: "A complete pipeline from synthetic data to early warning signals"
+output:
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE, warning = FALSE,
+  fig.width = 10, fig.height = 6, dpi = 120
+)
+```
+
+# 1. Setup
+
+This tutorial walks through the full resilience analysis pipeline: generate synthetic data with known ground-truth phases, quantify resilience through rolling-window metrics, classify the system's state over time, estimate long-range dependence via the Hurst exponent, detect early warning signals (univariate and multivariate), locate structural changepoints, analyse spectral noise colour, map stability landscapes, test significance with surrogates, and confirm robustness with sensitivity analysis. All state sequences are exported to TNA format for transition network analysis.
+
+Each step builds on the previous one. Resilience metrics tell you *how stable* the system is at each moment; the Hurst exponent tells you *how the system's memory structure is evolving*; early warning signals combine those dynamics into actionable alerts; changepoints locate where breaks occur; spectral and potential analyses provide independent confirmation from complementary perspectives; surrogate testing and sensitivity analysis establish that the findings are statistically significant and parameter-robust.
+
+```{r load}
+suppressWarnings(suppressMessages({
+  library(tidyverse)
+  library(codyna)
+  library(patchwork)
+  check_missing  <- codyna:::check_missing
+  check_match    <- codyna:::check_match
+  check_range    <- codyna:::check_range
+  check_flag     <- codyna:::check_flag
+  check_class    <- codyna:::check_class
+  prepare_timeseries_data <- codyna:::prepare_timeseries_data
+  stop_       <- codyna:::stop_
+  warning_    <- codyna:::warning_
+  message_    <- codyna:::message_
+  stopifnot_  <- codyna:::stopifnot_
+  ifelse_     <- codyna:::ifelse_
+  try_        <- codyna:::try_
+  onlyif      <- codyna:::onlyif
+  source("../R/datagen.R")
+  source("../R/resilience.R")
+  source("../R/hurst.R")
+  source("../R/trend.R")
+  source("../R/multivariate_ews.R")
+  source("../R/changepoint.R")
+  source("../R/spectral.R")
+  source("../R/potential.R")
+  source("../R/surrogates.R")
+  source("../R/sensitivity.R")
+  source("../R/to_tna.R")
+}))
+```
+
+# 2. Generate Data
+
+Resilience analyses need data where the ground truth is known so you can verify that metrics and classifiers detect what they should. `generate_ts_data()` creates time series with labelled phases --- stable plateaus, shocks, recovery ramps, volatile bursts, and turbulent drift --- at controlled proportions.
+
+We use two stable levels so the series has a clear regime shift between "Stable Low" and "Stable High", which is the simplest non-trivial case for testing whether the pipeline distinguishes genuine transitions from noise.
+
+```{r generate-data, fig.height=5}
+gen <- generate_ts_data(
+  n_individuals   = 1,
+  data_length     = 500,
+  data_type       = "resilience",
+  n_stable_levels = 2,
+  seed            = 42,
+  generate_plot   = TRUE
+)
+ts_data <- gen$data
+gen$plot
+```
+
+The coloured bands are the true phases baked into the data. Every downstream analysis is tested against these labels.
+
+## Tipping-point data
+
+`generate_tipping_data()` produces a different kind of synthetic system: multivariate with a known tipping point. Before time 100 the system is strongly mean-reverting (Ornstein--Uhlenbeck with restoring force 0.5); after, the restoring force decays toward zero and noise amplifies. This produces the hallmark signatures of critical slowing down --- rising autocorrelation and rising variance --- that early warning signal methods are designed to detect.
+
+```{r tipping-data, fig.height=4}
+tip <- generate_tipping_data(n_time = 200, n_vars = 3, tipping_point = 100)
+tip_long <- tip %>%
+  pivot_longer(-Time, names_to = "variable", values_to = "value")
+
+ggplot(tip_long, aes(Time, value, color = variable)) +
+  geom_line(linewidth = 0.5) +
+  geom_vline(xintercept = 100, linetype = "dashed", color = "red") +
+  annotate("text", x = 102, y = max(tip_long$value) * 0.9,
+           label = "Tipping point", hjust = 0, color = "red", size = 3.5) +
+  theme_minimal() +
+  labs(x = "Time", y = "Value", color = NULL)
+```
+
+## Comparing classifications to ground truth
+
+`compare_ts()` overlays any classification column against the true phases as coloured bands. Here we compare the ground truth to itself as a sanity check --- in practice you would pass a model's predicted labels in `state2`.
+
+```{r compare-ts, fig.height=5}
+compare_ts(
+  data     = ts_data,
+  ts_col   = "value",
+  time_col = "time",
+  state1   = "true_phase",
+  title1   = "Ground Truth Phases"
+)
+```
+
+# 3. Trend Analysis
+
+Before quantifying resilience, it helps to know the local direction of the series at each moment. `compute_trend()` slides a rolling window across the time series, classifies each point as **ascending**, **descending**, **flat**, or **turbulent**, and returns the result as a typed `trend` object with `time`, `value`, `metric`, and `state` columns.
+
+The turbulence classification is not based on raw variance but on the *volatility of the trend metric itself* --- a combined score mixing the coefficient of variation and the normalized range of the rolling slope. A series can be steeply rising without being turbulent (stable trend), or nearly flat yet turbulent (noisy, directionless fluctuations). The `flat_to_turbulent_factor` introduces hysteresis, requiring a higher volatility score to reclassify a flat segment as turbulent.
+
+```{r trend, fig.height=5}
+tr <- compute_trend(ts_data$value, window = 60, method = "slope",
+                    slope_method = "robust", turbulence_threshold = 10)
+plot(tr)
+```
+
+The ribbon view stacks the state classification as a coloured bar beneath the time series, matching the display style used for resilience (Section 5) and Hurst (Section 6) ribbons.
+
+```{r trend-ribbon, fig.height=5}
+plot(tr, type = "ribbons")
+```
+
+```{r trend-summary}
+summary(tr)
+```
+
+The coloured background bands map directly to the four trend states. Compare these to the ground-truth phases from Section 2: stable segments should appear as flat or mildly ascending/descending; shock/recovery segments should trigger ascending/descending transitions; turbulent and volatile phases should light up the turbulence detector.
+
+```{r trend-compare, fig.height=5}
+compare_ts(tr, ts_col = "value", time_col = "time",
+           state1 = "state", title1 = "Computed Trend")
+```
+
+Three estimation methods are available. OLS slope is the fastest but outlier-sensitive; the Theil-Sen robust estimator (default) takes the median of all pairwise slopes; rank-based methods (Spearman, Kendall) are non-parametric alternatives that measure monotonic tendency rather than linear rate.
+
+```{r trend-methods, fig.height=16}
+methods <- c("ols", "robust", "spearman", "kendall")
+trend_plots <- lapply(methods, function(sm) {
+  t <- compute_trend(ts_data$value, window = 60, slope_method = sm,
+                     turbulence_threshold = 10)
+  plot(t) + ggplot2::labs(subtitle = paste("slope_method =", sm))
+})
+patchwork::wrap_plots(trend_plots, ncol = 1)
+```
+
+# 4. Resilience Analysis
+
+Rolling-window resilience metrics answer *"how is system stability changing over time?"* rather than giving a single summary. Each window yields eight metrics that capture different failure modes:
+
+- **VSI** (stability): variance of rolling variances --- low means the system's spread is consistent; spikes flag structural breaks.
+- **ARCH-LM** (volatility clustering): whether large shocks cluster together, which precedes cascading failures.
+- **CV** (variability): coefficient of variation --- distinguishes noisy-but-centered from genuinely drifting.
+- **DFA alpha** (memory): scaling exponent from detrended fluctuation analysis --- values near 0.5 are random; above 0.5 means the system "remembers" recent states.
+- **AC ratio** (correlation): lag-1 autocorrelation relative to higher lags --- persistent systems have high ratios.
+- **Sample entropy** (complexity): regularity of the signal --- low entropy means predictable dynamics.
+- **Recovery time/slope**: how quickly and steeply the system returns to baseline after shocks.
+
+```{r resilience, fig.height=7}
+res <- resilience(ts_data$value, window = 50)
+plot(res, type = "lines")
+```
+
+Each facet is an independent lens on the same underlying dynamics. Look for co-movement: when VSI, ARCH-LM, and CV all spike simultaneously, the system is in genuine distress rather than just experiencing a single-metric anomaly.
+
+# 5. Classification
+
+Raw metrics are on incomparable scales. `classify_resilience()` applies directional normalisation (high VSI is bad; high recovery slope is good) and computes a weighted composite score on a 0--1 scale. The default weights come from empirical validation against known resilience phases: VSI (0.256) and CV (0.226) dominate because they are the most discriminating.
+
+The composite score maps to six categories: Excellent (0--0.15), Solid (0.15--0.30), Fair (0.30--0.50), Vulnerable (0.50--0.70), Failing (0.70--0.85), Troubled (0.85--1.0).
+
+```{r classify, fig.height=7}
+cls <- classify_resilience(res)
+plot(cls, type = "ribbons")
+```
+
+The ribbon plot stacks the composite and per-metric scores as coloured bands beneath the time series. Green regions are stable; red regions need attention. The OVERALL band is the weighted composite --- it should track the true phases from Section 2. Individual metric ribbons reveal *which dimension* is driving the composite when it shifts.
+
+```{r composite-summary}
+cls %>%
+  filter(!is.na(composite_category)) %>%
+  count(composite_category) %>%
+  mutate(pct = round(100 * n / sum(n), 1)) %>%
+  arrange(composite_category)
+```
+
+# 6. Hurst Analysis
+
+The Hurst exponent quantifies long-range dependence --- how strongly the system's past predicts its future. A value of 0.5 is a random walk (no memory); above 0.5 the system is persistent (trends continue); below 0.5 it is antipersistent (trends reverse). Tracking how this exponent *changes over time* reveals when the system's memory structure is destabilising.
+
+DFA (Detrended Fluctuation Analysis) is the default method because it handles non-stationarity and trends that would bias classical R/S analysis.
+
+```{r hurst, fig.height=7}
+h <- hurst(ts_data$value, method = "dfa", window = 50)
+plot(h, type = "both")
+```
+
+The top panel shows the time series with state-coloured backgrounds. The bottom panel shows the Hurst trajectory against threshold bands. Transitions between states --- persistent to random walk, or random walk to antipersistent --- are where the system's dynamical character is changing. These transitions often precede the resilience shifts detected in Section 5.
+
+```{r hurst-state-table}
+h %>%
+  count(state) %>%
+  mutate(pct = round(100 * n / sum(n), 1)) %>%
+  arrange(desc(n))
+```
+
+# 7. Early Warning Signals
+
+`detect_hurst_warnings()` combines ten binary indicators --- extreme values, trends, volatility, flickering between states, variance ratio shifts, spectral changes, autocorrelation increases, and state persistence --- into a graded warning score. Each indicator fires when its signal exceeds a data-adaptive threshold (typically the 90th percentile), so the detector calibrates itself to the specific time series rather than relying on fixed cutoffs.
+
+Warning levels are quantile-based: level 1 (low) means a few indicators are firing; level 4 (critical) means the enhanced score exceeds the 95th percentile of all non-zero scores, with neighbouring time points also showing warnings.
+
+```{r ews, fig.height=9}
+ews <- detect_hurst_warnings(h)
+plot(ews)
+```
+
+The three-panel EWS plot reads top to bottom: (1) the Hurst trajectory with warning-level backgrounds, (2) the discrete warning level over time, and (3) a heatmap of which specific indicators are active at each moment. Isolated indicator activations are noise; *stacked* activations (multiple rows lit at the same time) are genuine alerts.
+
+```{r ews-summary}
+summary(ews)
+```
+
+# 8. Spectral Early Warning Signals
+
+Near a critical transition, power shifts from high to low frequencies --- the spectral exponent increases as the system "reddens." This spectral reddening is complementary to rising autocorrelation and variance (Section 7) because it captures the same phenomenon (critical slowing down) through a frequency-domain lens. When time-domain indicators are ambiguous, spectral analysis can provide independent confirmation.
+
+`spectral_ews()` slides a rolling window across the series, fits a log-log regression of power vs. frequency at each position, and extracts the spectral exponent (beta) and spectral ratio (low-to-high frequency power). Each time point is classified into one of four noise-colour states based on the exponent.
+
+```{r spectral, fig.height=7}
+sp <- spectral_ews(ts_data$value, window = 50, states = TRUE)
+plot(sp)
+```
+
+The top panel shows the time series with state-coloured backgrounds (noise-colour bands). The bottom panel shows the spectral exponent trajectory against threshold bands. A shift from white/pink toward red/brownian indicates approaching a transition.
+
+```{r spectral-summary}
+summary(sp)
+```
+
+```{r spectral-states}
+sp %>%
+  filter(!is.na(state)) %>%
+  count(state) %>%
+  mutate(pct = round(100 * n / sum(n), 1)) %>%
+  arrange(desc(n))
+```
+
+# 9. Multivariate Early Warning Signals
+
+The univariate EWS from Sections 7--8 track one variable at a time. When a system has multiple interacting components, coordinated changes across variables --- rising cross-correlation, aligned slowing down, shared variance growth --- are stronger predictors of transitions than any single-variable signal. `detect_multivariate_warnings()` computes eleven metrics that capture these coordinated dynamics through three lenses: raw summary statistics (mean/max SD and AR(1) across variables), dimension-reduction indicators (MAF and PCA), and covariance-structure metrics.
+
+## Expanding window analysis
+
+The expanding window grows from the start of the series, z-scoring each metric incrementally. Warnings fire when the standardized strength exceeds a threshold (default 2 SD). The system state is classified by how many metrics are simultaneously in warning.
+
+```{r mews-expanding, fig.height=9}
+multi_exp <- detect_multivariate_warnings(
+  data    = tip,
+  method  = "expanding",
+  window  = 50,
+  metrics = "all"
+)
+plot(multi_exp)
+```
+
+The panels read top to bottom: (1) MAF1 and PC1 --- low-dimensional summaries of the system's trajectory, with warning points where the scaled value exceeds the threshold; (2) standardized metric strengths, where points mark individual threshold crossings; (3) the system-state ribbon, aggregating across metrics into Stable / Vulnerable / Warning / Critical / Failing.
+
+```{r mews-expanding-summary}
+summary(multi_exp)
+```
+
+## Rolling window analysis
+
+The rolling window provides a fixed-length view of how each metric trends over time. Kendall's tau measures the monotonic trend; values above 0.7 flag metrics with strong upward trajectories consistent with approaching a transition.
+
+```{r mews-rolling, fig.height=9}
+multi_roll <- detect_multivariate_warnings(
+  data    = tip,
+  method  = "rolling",
+  window  = 50,
+  metrics = "all"
+)
+plot(multi_roll)
+```
+
+Each facet panel shows one metric's standardized trajectory; the panel title includes the Kendall tau value. Metrics with strong positive trends (high tau) in the post-tipping-point region confirm that the multivariate system is losing stability in a coordinated way.
+
+```{r mews-rolling-summary}
+summary(multi_roll)
+```
+
+# 10. Changepoint Detection
+
+Changepoint detection locates the exact moments where the statistical properties of a series change abruptly. This is distinct from trend classification (Section 3), which classifies the *local direction* at each point --- changepoint detection finds the *structural break locations*. Knowing where breaks occur matters because resilience metrics and EWS computed across a break are unreliable: a window straddling a mean shift produces artificially inflated variance and autocorrelation.
+
+Each detected segment receives a **smart regime ID**: segments with similar means are grouped into the same regime (e.g., regime 1, 2, 1, 2 for a series that oscillates between two levels). Each changepoint is classified as a **change** (transition to a new regime) or **return** (transition back to a previously visited regime). Segments are also labelled by **level** (high/medium/low relative to the overall mean) and **direction** (higher/lower/no_change from the previous segment). The combined state label (e.g., `high_change`, `low_return`, `medium_initial`) feeds directly into TNA for transition network analysis.
+
+Three algorithms are available: CUSUM (single best changepoint), binary segmentation (recursive splitting, fast and approximate), and PELT (optimal partitioning with dynamic programming, exact with linear computational cost).
+
+```{r changepoint-detect, fig.height=5}
+# Create a series with known mean shifts
+set.seed(42)
+x_cp <- c(rnorm(150, 0, 1), rnorm(100, 4, 1), rnorm(150, -2, 1.5), rnorm(100, 3, 0.8))
+
+# PELT: optimal detection with BIC penalty
+cp <- detect_changepoints(x_cp, method = "pelt", type = "mean")
+plot(cp, type = "both")
+```
+
+The top panel colours each detected segment; red dashed lines mark changepoint locations. The bottom panel overlays the segment mean step function on the original data, showing whether the detected means track the actual structural levels.
+
+```{r changepoint-summary}
+summary(cp)
+```
+
+## Method comparison
+
+Binary segmentation is faster but approximate; CUSUM finds only one break; PELT is exact but requires a good penalty. The penalty controls sensitivity: BIC is conservative, AIC more liberal, and manual lets you tune explicitly.
+
+```{r changepoint-methods, fig.height=7}
+colors <- c(
+  high_initial = "#E53935", high_change = "#C62828", high_return = "#EF5350",
+  medium_initial = "#FFA726", medium_change = "#F57C00", medium_return = "#FFCC80",
+  low_initial = "#43A047", low_change = "#2E7D32", low_return = "#66BB6A"
+)
+methods <- c("cusum", "binary_segmentation", "pelt")
+cp_list <- lapply(stats::setNames(methods, methods), function(m) {
+  detect_changepoints(x_cp, method = m, type = "mean")
+})
+
+# Collect all states across methods for a shared palette
+all_states <- unique(unlist(lapply(cp_list, function(obj) levels(obj$state))))
+ribbon_colors <- colors[intersect(all_states, names(colors))]
+
+# Time series panel
+p_ts <- ggplot2::ggplot(
+  data.frame(time = seq_along(x_cp), value = x_cp),
+  ggplot2::aes(x = !!rlang::sym("time"), y = !!rlang::sym("value"))
+) +
+  ggplot2::geom_line(linewidth = 0.4, color = "grey30") +
+  ggplot2::labs(x = NULL, y = "Value", title = "Changepoint Method Comparison") +
+  ggplot2::theme_minimal() +
+  ggplot2::theme(
+    plot.title = ggplot2::element_text(size = 14, face = "bold"),
+    axis.title = ggplot2::element_text(color = "black", face = "bold"),
+    axis.text = ggplot2::element_text(color = "black"),
+    axis.text.x = ggplot2::element_blank(),
+    axis.ticks.x = ggplot2::element_blank()
+  )
+
+# Build ribbon strips -- one per method
+ribbon_plots <- lapply(seq_along(methods), function(i) {
+  m <- methods[i]
+  d <- cp_list[[m]]
+  is_last <- i == length(methods)
+  ggplot2::ggplot(d, ggplot2::aes(
+    x = !!rlang::sym("time"), y = 1,
+    fill = !!rlang::sym("state")
+  )) +
+    ggplot2::geom_tile(height = 1) +
+    ggplot2::scale_fill_manual(values = ribbon_colors, name = "State", drop = FALSE) +
+    ggplot2::scale_y_continuous(breaks = NULL) +
+    ggplot2::labs(x = if (is_last) "Time" else NULL, y = m) +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(
+      axis.text.y = ggplot2::element_blank(),
+      axis.title.y = ggplot2::element_text(
+        size = 9, face = "bold", angle = 0, vjust = 0.5
+      ),
+      axis.text.x = if (is_last) ggplot2::element_text(color = "black")
+                    else ggplot2::element_blank(),
+      axis.ticks.x = if (is_last) ggplot2::element_line()
+                     else ggplot2::element_blank(),
+      axis.title.x = if (is_last) ggplot2::element_text(color = "black", face = "bold")
+                     else ggplot2::element_blank(),
+      legend.position = if (is_last) "bottom" else "none",
+      plot.margin = ggplot2::margin(1, 5, 1, 5)
+    )
+})
+
+patchwork::wrap_plots(
+  c(list(p_ts), ribbon_plots),
+  ncol = 1, heights = c(4, 1, 1, 1)
+) + patchwork::plot_layout(guides = "collect") &
+  ggplot2::theme(legend.position = "bottom")
+```
+
+## Detecting variance changes
+
+Setting `type = "variance"` detects changes in variability rather than level --- useful when the mean stays constant but the noise structure changes (a common precursor to tipping).
+
+```{r changepoint-variance, fig.height=5}
+cp_var <- detect_changepoints(x_cp, method = "pelt", type = "both")
+plot(cp_var, type = "both")
+```
+
+# 11. Potential Analysis
+
+Potential analysis characterises the stability landscape of a time series --- how many stable states (wells) exist, where they are, and how deep the barriers between them are. The quasi-potential U(x) = -log(P(x)) is estimated from kernel density: minima are wells (stable attractors), maxima are barriers (unstable equilibria). A system with one well is stable; the appearance of a second well signals an alternative stable state the system could tip into.
+
+## Global landscape
+
+In global mode, a single landscape is estimated from the entire series. This tells you the overall structure of the system's state space.
+
+```{r potential-global, fig.height=5}
+# Bimodal data: two clear stable states
+set.seed(42)
+x_bimodal <- c(rnorm(1000, -2, 0.5), rnorm(1000, 2, 0.5))
+pa <- potential_analysis(x_bimodal)
+plot(pa, type = "both")
+```
+
+The landscape panel shows the quasi-potential with wells (green dots at minima) and barriers (red dots at maxima). The density panel shows the underlying probability density. Two wells separated by a barrier confirm bistability.
+
+```{r potential-summary}
+summary(pa)
+```
+
+## Rolling landscape
+
+In rolling mode, the landscape is re-estimated for each window position. The number of wells at each time point reveals *when* alternative stable states appear or disappear --- a direct indicator of approaching bifurcations.
+
+```{r potential-rolling, fig.height=5}
+pa_roll <- potential_analysis(ts_data$value, window = 100)
+plot(pa_roll)
+```
+
+```{r potential-rolling-summary}
+summary(pa_roll)
+```
+
+# 12. Surrogate Significance Testing
+
+When a rolling EWS metric shows a trend --- rising AR(1), increasing variance --- you need to know whether that trend is real or just an artifact of the series' spectral structure. A random series with the same power spectrum can produce spurious trends by chance. Surrogate testing quantifies this directly.
+
+`surrogate_test()` works in three steps:
+
+1. Compute the rolling metric on the original series and measure its Kendall tau (trend strength: +1 = perfect upward trend, -1 = perfect downward, 0 = no trend).
+2. Generate 100 synthetic ("surrogate") series that preserve the original's power spectrum but destroy any systematic trend direction. Compute the same tau on each.
+3. Compare: p-value = fraction of surrogates with tau >= observed tau. If p < 0.05, the observed trend is stronger than what noise alone produces.
+
+We use `VAR1` from the tipping-point data (Section 2), which has a gradual loss of stability approaching a known transition at t = 100. The restoring force decays from 0.5 toward zero while noise amplifies --- exactly the pattern EWS metrics should detect.
+
+## AR(1) trend
+
+```{r surrogate-ar1, fig.height=7}
+set.seed(42)
+st_ar1 <- surrogate_test(tip$VAR1, n_surrogates = 199, metric = "ar1",
+                         window = 50, method = "phase")
+plot(st_ar1)
+```
+
+```{r surrogate-ar1-summary}
+summary(st_ar1)
+```
+
+The AR(1) result: observed tau = `r round(st_ar1$observed_tau, 3)`, p = `r round(st_ar1$p_value, 3)`. The red dashed line sits deep in the right tail of the histogram --- only `r round(st_ar1$p_value * 100, 1)`% of the 199 surrogates produce a trend this strong. At the 5% threshold, this is **significant**. The autocorrelation is rising steadily as the restoring force weakens, and surrogates with the same power spectrum cannot replicate this directional trend.
+
+In the bottom panel, the observed rolling AR(1) (red line) climbs above the 95% surrogate envelope (shaded band) in the second half of the series, precisely where the system's restoring force is decaying toward zero.
+
+## Standard deviation trend
+
+```{r surrogate-sd, fig.height=7}
+set.seed(42)
+st_sd <- surrogate_test(tip$VAR1, n_surrogates = 199, metric = "sd",
+                        window = 50, method = "phase")
+plot(st_sd)
+```
+
+```{r surrogate-sd-summary}
+summary(st_sd)
+```
+
+The SD result: observed tau = `r round(st_sd$observed_tau, 3)`, p = `r round(st_sd$p_value, 3)`. The red dashed line sits far beyond the surrogate distribution --- none of the 199 surrogates produce a trend this strong. This is **highly significant**. The variance increase is unambiguous: as the restoring force weakens, perturbations persist longer and noise amplifies, driving variance up sharply.
+
+In the bottom panel, the observed rolling SD (red line) separates from the surrogate envelope after t = 100, climbing steeply through the destabilization period. The surrogates (shaded band) stay flat.
+
+## Comparing metrics
+
+```{r surrogate-comparison}
+cat(sprintf("AR(1) trend: tau = %+.3f, p = %.3f, significant = %s\n",
+            st_ar1$observed_tau, st_ar1$p_value, st_ar1$significant))
+cat(sprintf("SD trend:    tau = %+.3f, p = %.3f, significant = %s\n",
+            st_sd$observed_tau, st_sd$p_value, st_sd$significant))
+```
+
+Both metrics are significant, confirming that the critical slowing down signal in this system is genuine. SD (tau = `r round(st_sd$observed_tau, 3)`) has a stronger trend than AR(1) (tau = `r round(st_ar1$observed_tau, 3)`) because variance responds to both the weakening restoring force *and* the increasing noise, while autocorrelation responds only to the restoring-force decay. Testing multiple metrics is good practice: if only one fires, the signal may be metric-specific; when both fire, confidence in a genuine transition increases.
+
+## Surrogate methods
+
+Four generation methods are available, each preserving different properties of the original series:
+
+| Method | Preserves | Best for |
+|--------|-----------|----------|
+| `"phase"` | Power spectrum | Gaussian-like data (default) |
+| `"shuffle"` | Nothing (full permutation) | Simplest null hypothesis |
+| `"aaft"` | Spectrum + amplitude distribution | Non-Gaussian data |
+| `"block"` | Local autocorrelation within blocks | When short-range dependence matters |
+
+## Surrogate methods
+
+Four generation methods are available, each preserving different properties of the original series:
+
+| Method | Preserves | Best for |
+|--------|-----------|----------|
+| `"phase"` | Power spectrum | Gaussian-like data (default) |
+| `"shuffle"` | Nothing (full permutation) | Simplest null hypothesis |
+| `"aaft"` | Spectrum + amplitude distribution | Non-Gaussian data |
+| `"block"` | Local autocorrelation within blocks | When short-range dependence matters |
+
+# 13. Sensitivity Analysis
+
+Before reporting that an EWS metric shows a significant trend, you should verify that the result is robust to the choice of window size and detrending method. `sensitivity_ews()` sweeps across a grid of parameter combinations, computes the rolling metric and its Kendall tau for each, and produces a robustness matrix.
+
+If tau values are consistently positive across the parameter space, the EWS trend is robust. If they flip sign depending on window size or detrend method, the result is fragile and should be interpreted cautiously.
+
+```{r sensitivity, fig.height=6}
+sa <- sensitivity_ews(ts_data$value, metric = "ar1")
+plot(sa, type = "heatmap")
+```
+
+The heatmap shows Kendall's tau for each window size x detrend combination. Green tiles indicate robust positive trends; red tiles flag fragile or negative results. A pattern of all-green confirms the EWS finding is not an artifact of parameter choice.
+
+```{r sensitivity-summary}
+summary(sa)
+```
+
+```{r sensitivity-lines, fig.height=6}
+plot(sa, type = "lines")
+```
+
+The line plot facets show the actual metric trajectory for each parameter combination, making it visible how the window size affects the smoothness and trend of the signal.
+
+## Testing other metrics
+
+```{r sensitivity-sd, fig.height=5}
+sa_sd <- sensitivity_ews(ts_data$value, metric = "sd")
+plot(sa_sd, type = "heatmap") +
+  ggplot2::labs(subtitle = "Sensitivity: Standard Deviation")
+```
+
+# 14. Sequence Export with `to_tna()`
+
+Every analysis in the pipeline produces a categorical state ribbon --- the coloured bands in the plots above. These ribbons are embedded inside complex objects alongside raw scores, metrics, and attributes. `to_tna()` extracts the state ribbon as a wide-format tibble ready for sequence analysis: one row per individual, columns `T1, T2, T3, ...`, each containing the state label at that time point.
+
+The wide format is directly compatible with:
+
+- **`tna::prepare_data()`** for transition network analysis
+- **`TraMineR::seqdef()`** for sequence mining and visualisation
+- **Cluster analysis** on sequence dissimilarity matrices
+- Any method that expects a cases-by-time categorical matrix
+
+## Supported objects and their state columns
+
+| Object | `state =` | States produced |
+|--------|-----------|-----------------|
+| `resilience` (classified) | `"composite"` (default), or any metric name: `"vsi"`, `"cv"`, `"arch_lm"`, `"dfa_alpha"`, `"ac_ratio"`, `"sample_entropy"`, `"recovery_time"`, `"recovery_slope"` | Excellent, Solid, Fair, Vulnerable, Failing, Troubled |
+| `hurst` | `"state"` (default) | strong_antipersistent, antipersistent, random_walk, persistent, strong_persistent |
+| `hurst` (MFDFA) | `"mf_category"` | monofractal, weak_multifractal, moderate_multifractal, strong_multifractal |
+| `hurst_ews` | `"warning_label"` (default) | none, low, moderate, high, critical |
+| `hurst_ews` | `"state"` | (same as hurst states above) |
+| `multi_ews` (expanding) | (no `state` argument) | Stable, Vulnerable, Warning, Critical, Failing |
+| `trend` | (no `state` argument) | ascending, descending, flat, turbulent |
+| `changepoint` | `"state"` (default), `"level"`, `"direction"`, `"regime"`, `"segment"` | high_change, low_return, medium_initial, ... |
+| `spectral` | (no `state` argument) | white_noise, pink_noise, red_noise, brownian |
+| `potential` (rolling) | (no `state` argument) | flat, unimodal, bimodal, multimodal |
+
+Objects without state classifications --- unclassified `resilience`, `hurst_global`, rolling `multi_ews`, `surrogate_test`, `sensitivity_ews` --- are rejected with an informative error explaining what to do.
+
+## Visualising state sequences
+
+Rather than inspecting raw T1, T2, ... columns, ribbon plots show each state sequence as a colour-coded strip over time, with a frequency bar summarising how long the system spent in each state.
+
+```{r tna-helper}
+# Helper: convert a to_tna() wide tibble into a ribbon + frequency bar
+plot_sequence <- function(seq_wide, title, palette = NULL) {
+  states_vec <- as.character(unlist(seq_wide[1, ]))
+  lvls <- unique(states_vec)
+  df <- tibble::tibble(
+    t = seq_along(states_vec),
+    state = factor(states_vec, levels = lvls)
+  )
+  freq <- as.data.frame(table(state = states_vec), stringsAsFactors = FALSE)
+  freq$state <- factor(freq$state, levels = lvls)
+  freq$pct <- freq$Freq / sum(freq$Freq) * 100
+
+  p_ribbon <- ggplot2::ggplot(df, ggplot2::aes(
+    x = !!rlang::sym("t"), y = 1,
+    fill = !!rlang::sym("state")
+  )) +
+    ggplot2::geom_tile(height = 1, width = 1) +
+    ggplot2::labs(x = "Time step", y = NULL, title = title) +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      panel.grid = ggplot2::element_blank(),
+      legend.position = "bottom",
+      legend.title = ggplot2::element_blank(),
+      plot.title = ggplot2::element_text(face = "bold", size = 12)
+    ) +
+    ggplot2::guides(fill = ggplot2::guide_legend(nrow = 1))
+
+  p_bar <- ggplot2::ggplot(freq, ggplot2::aes(
+    x = !!rlang::sym("state"), y = !!rlang::sym("pct"),
+    fill = !!rlang::sym("state")
+  )) +
+    ggplot2::geom_col(width = 0.7, show.legend = FALSE) +
+    ggplot2::geom_text(
+      ggplot2::aes(label = sprintf("%.0f%%", !!rlang::sym("pct"))),
+      vjust = -0.3, size = 3
+    ) +
+    ggplot2::labs(x = NULL, y = "% of time") +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(panel.grid.major.x = ggplot2::element_blank())
+
+  if (!is.null(palette)) {
+    p_ribbon <- p_ribbon + ggplot2::scale_fill_manual(values = palette, drop = FALSE)
+    p_bar <- p_bar + ggplot2::scale_fill_manual(values = palette, drop = FALSE)
+  }
+
+  patchwork::wrap_plots(p_ribbon, p_bar, ncol = 2, widths = c(3, 1)) +
+    patchwork::plot_layout(guides = "collect") &
+    ggplot2::theme(legend.position = "bottom")
+}
+```
+
+## Resilience sequences
+
+The composite sequence captures the overall system health trajectory. Per-metric sequences isolate individual dimensions --- useful when you want to study transitions in stability (VSI) separately from transitions in memory (DFA alpha).
+
+```{r tna-resilience, fig.height=4}
+seq_composite <- to_tna(cls)
+seq_vsi <- to_tna(cls, state = "vsi")
+seq_cv  <- to_tna(cls, state = "cv")
+
+res_pal <- c(
+  Excellent = "#1B5E20", Solid = "#43A047", Fair = "#FDD835",
+  Vulnerable = "#FFA726", Failing = "#E53935", Troubled = "#B71C1C"
+)
+plot_sequence(seq_composite, "Composite Resilience", res_pal)
+```
+
+```{r tna-resilience-dist, fig.height=4}
+plot_sequence(seq_vsi, "VSI (Stability)", res_pal)
+```
+
+## Hurst memory sequences
+
+The Hurst state sequence reveals when the system shifts between memory regimes. A transition from persistent to random walk means the system is losing its ability to maintain state.
+
+```{r tna-hurst, fig.height=4}
+seq_hurst <- to_tna(h)
+
+hurst_pal <- c(
+  strong_antipersistent = "#1A237E", antipersistent = "#5C6BC0",
+  random_walk = "#9E9E9E", persistent = "#EF6C00",
+  strong_persistent = "#BF360C"
+)
+plot_sequence(seq_hurst, "Hurst Memory States", hurst_pal)
+```
+
+## Early warning sequences
+
+The EWS warning sequence captures when the system is under stress versus calm. This is the most actionable sequence for intervention timing.
+
+```{r tna-ews, fig.height=4}
+seq_ews <- to_tna(ews)
+seq_ews_state <- to_tna(ews, state = "state")
+
+ews_pal <- c(
+  none = "#43A047", low = "#FDD835", moderate = "#FFA726",
+  high = "#E53935", critical = "#B71C1C"
+)
+plot_sequence(seq_ews, "EWS Warning Levels", ews_pal)
+```
+
+```{r tna-ews-dist, fig.height=4}
+plot_sequence(seq_ews_state, "Underlying Hurst States", hurst_pal)
+```
+
+## Trend state sequences
+
+The trend state sequence captures the local direction of the series at each time point --- useful for studying macro-level transition patterns between directional regimes.
+
+```{r tna-trend, fig.height=4}
+seq_trend <- to_tna(tr)
+
+trend_pal <- c(
+  ascending = "#1B5E20", descending = "#C62828",
+  flat = "#9E9E9E", turbulent = "#FF6F00"
+)
+plot_sequence(seq_trend, "Trend States", trend_pal)
+```
+
+## Multivariate system state sequences
+
+The expanding-window multivariate EWS aggregates evidence across all eleven metrics into a single system-level state (Stable through Failing).
+
+```{r tna-mews, fig.height=4}
+seq_mews <- to_tna(multi_exp)
+
+mews_pal <- c(
+  Stable = "#1B5E20", Vulnerable = "#FDD835", Warning = "#FFA726",
+  Critical = "#E53935", Failing = "#B71C1C"
+)
+plot_sequence(seq_mews, "Multivariate System States", mews_pal)
+```
+
+## Changepoint regime sequences
+
+The default changepoint state sequence combines level (high/medium/low) with changepoint type (initial/change/return). The `state` argument selects alternative representations: `"level"`, `"direction"`, `"regime"`, or `"segment"`.
+
+```{r tna-changepoint, fig.height=4}
+seq_cp <- to_tna(cp)
+seq_cp_level  <- to_tna(cp, state = "level")
+seq_cp_regime <- to_tna(cp, state = "regime")
+
+plot_sequence(seq_cp, "Changepoint States (level + type)")
+```
+
+```{r tna-changepoint-level, fig.height=4}
+level_pal <- c(low = "#43A047", medium = "#FFA726", high = "#E53935")
+plot_sequence(seq_cp_level, "Changepoint Levels", level_pal)
+```
+
+## Spectral noise-colour sequences
+
+A transition from white to pink to red noise indicates progressive spectral reddening --- an independent EWS complementary to the autocorrelation-based warnings.
+
+```{r tna-spectral, fig.height=4}
+seq_sp <- to_tna(sp)
+
+spec_pal <- c(
+  white_noise = "#E0E0E0", pink_noise = "#F48FB1",
+  red_noise = "#C62828", brownian = "#4E342E"
+)
+plot_sequence(seq_sp, "Spectral Noise Colour", spec_pal)
+```
+
+## Potential stability state sequences
+
+Transitions from unimodal to bimodal signal the emergence of alternative stable states --- a hallmark of approaching bifurcations.
+
+```{r tna-potential, fig.height=4}
+seq_pot <- to_tna(pa_roll)
+
+pot_pal <- c(
+  flat = "#BDBDBD", unimodal = "#43A047",
+  bimodal = "#FFA726", multimodal = "#C62828"
+)
+plot_sequence(seq_pot, "Potential Stability States", pot_pal)
+```
+
+## Feeding sequences to TNA
+
+The wide-format output plugs directly into `tna::tna()`. Here is the pattern for building a transition network from any extracted sequence:
+
+```{r tna-integration, fig.height=9}
+library(tna)
+
+# Build TNA models directly from wide-format sequences
+tna_res <- tna::tna(to_tna(cls))
+tna_h   <- tna::tna(to_tna(h))
+tna_ews <- tna::tna(to_tna(ews))
+tna_tr  <- tna::tna(to_tna(tr))
+tna_cp  <- tna::tna(to_tna(cp))
+tna_sp  <- tna::tna(to_tna(sp))
+
+par(mfrow = c(2, 3), mar = c(2, 2, 3, 1))
+plot(tna_res, main = "Resilience States")
+plot(tna_h, main = "Hurst Memory States")
+plot(tna_ews, main = "EWS Warning Levels")
+plot(tna_tr, main = "Trend States")
+plot(tna_cp, main = "Changepoint Segments")
+plot(tna_sp, main = "Spectral Noise Colours")
+par(mfrow = c(1, 1), mar = c(5, 4, 4, 2) + 0.1)
+```
+
+## Verification
+
+```{r tna-verify}
+all_seqs <- list(
+  composite = seq_composite, vsi = seq_vsi, cv = seq_cv,
+  hurst = seq_hurst, ews = seq_ews, trend = seq_trend, mews = seq_mews,
+  changepoint = seq_cp, spectral = seq_sp, potential = seq_pot
+)
+result <- vapply(names(all_seqs), function(nm) {
+  s <- all_seqs[[nm]]
+  all(nrow(s) == 1L, grepl("^T[0-9]+$", names(s)), vapply(s, is.character, logical(1)))
+}, logical(1))
+stopifnot(all(result))
+cat(sprintf("Verified %d sequences: all valid.\n", length(all_seqs)))
+```
+
+# 15. Synthesis
+
+The four layers of analysis connect as follows:
+
+**Trend classification** (Section 3) provides the macro-level view --- where the series is ascending, descending, flat, or turbulent. This anchors the remaining analyses to the local direction of the data.
+
+**Resilience metrics** (Section 4--5) measure the system's *current condition* --- stability, volatility, recovery capacity. The composite score tells you whether the system is healthy right now.
+
+**Hurst dynamics** (Section 6) measure the system's *memory structure* --- whether it is trending, mean-reverting, or structurally changing. A shift from persistent to random-walk means the system is losing its ability to maintain state.
+
+**Univariate early warning signals** (Section 7) detect *precursors to transitions* --- they fire before the resilience score deteriorates, because changes in memory structure and volatility precede the actual state shift.
+
+**Spectral EWS** (Section 8) capture critical slowing down through the frequency domain --- spectral reddening (shift from white to red noise) provides independent confirmation of the autocorrelation-based warnings.
+
+**Multivariate early warning signals** (Section 9) extend the detection to systems with multiple interacting variables, capturing coordinated changes (rising cross-correlation, synchronized slowing down, shared variance growth) that single-variable indicators miss.
+
+**Changepoint detection** (Section 10) locates the exact moments of structural breaks, so you know where mean or variance shifts occurred --- important for interpreting resilience metrics that might be misleading when computed across a break.
+
+**Potential analysis** (Section 11) reveals the stability landscape --- how many stable states exist and when alternative attractors appear or disappear, which is a direct indicator of approaching bifurcations.
+
+**Surrogate testing** (Section 12) establishes whether observed EWS trends are statistically significant by comparing against null distributions that preserve key properties of the original series.
+
+**Sensitivity analysis** (Section 13) confirms robustness --- if the EWS trend holds across a range of window sizes and detrending methods, you can report it with confidence.
+
+**Sequence export** (Section 14) bridges from analysis to network and sequence methods. `to_tna()` converts any state ribbon into the wide format that TNA, TraMineR, and clustering algorithms expect, so you can study *transition patterns* rather than just aggregate summaries.
+
+```{r synthesis, fig.height=8}
+combined <- tibble(
+  time      = h$time,
+  value     = h$value,
+  hurst     = h$hurst,
+  composite = cls$composite_score,
+  warning   = ews$warning_score
+)
+
+p1 <- ggplot(combined, aes(time, value)) +
+  geom_line(linewidth = 0.4) +
+  theme_minimal() +
+  labs(x = NULL, y = "Value", title = "Time Series")
+
+p2 <- ggplot(combined, aes(time, composite)) +
+  geom_line(color = "#d62728", linewidth = 0.5) +
+  geom_hline(yintercept = 0.5, linetype = "dashed", color = "grey50") +
+  theme_minimal() +
+  labs(x = NULL, y = "Composite\nResilience Score")
+
+p3 <- ggplot(combined, aes(time, hurst)) +
+  geom_line(color = "#1f77b4", linewidth = 0.5) +
+  geom_hline(yintercept = 0.5, linetype = "dashed", color = "grey50") +
+  theme_minimal() +
+  labs(x = NULL, y = "Hurst\nExponent")
+
+p4 <- ggplot(combined, aes(time, warning)) +
+  geom_area(fill = "#ff7f0e", alpha = 0.4) +
+  geom_line(color = "#ff7f0e", linewidth = 0.5) +
+  theme_minimal() +
+  labs(x = "Time", y = "EWS\nWarning Score")
+
+p1 / p2 / p3 / p4 + plot_layout(heights = c(2, 1, 1, 1))
+```
+
+Read the four panels together. When the composite resilience score rises (worse) while the Hurst exponent shifts regime and the EWS warning score spikes, the system is approaching or undergoing a critical transition. When all three are quiet, the system is in a stable phase. Spectral analysis (Section 8) confirms the reddening from an independent frequency-domain perspective. The multivariate EWS (Section 9) add a cross-variable perspective: coordinated metric increases across MAF, PCA, and covariance indicators strengthen the evidence. Changepoint detection (Section 10) pinpoints exactly where the break occurred. Potential analysis (Section 11) reveals whether alternative stable states are emerging. Surrogate testing (Section 12) verifies statistical significance, and sensitivity analysis (Section 13) confirms robustness. Together, these fifteen analytical layers provide converging evidence that is far stronger than any single indicator alone.
